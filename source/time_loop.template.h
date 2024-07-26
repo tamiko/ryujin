@@ -502,6 +502,7 @@ namespace ryujin
 
     SolutionTransfer<Description, dim, Number> solution_transfer(
         mpi_communicator_,
+        /* for write access: */ discretization_.triangulation(),
         offline_data_,
         hyperbolic_system_,
         parabolic_system_);
@@ -565,6 +566,7 @@ namespace ryujin
 
     SolutionTransfer<Description, dim, Number> solution_transfer(
         mpi_communicator_,
+        /* for write access: */ discretization_.triangulation(),
         offline_data_,
         hyperbolic_system_,
         parabolic_system_);
@@ -632,6 +634,7 @@ namespace ryujin
 
     SolutionTransfer<Description, dim, Number> solution_transfer(
         mpi_communicator_,
+        /* for write access: */ discretization_.triangulation(),
         offline_data_,
         hyperbolic_system_,
         parabolic_system_);

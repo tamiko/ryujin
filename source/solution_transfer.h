@@ -13,6 +13,8 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <optional>
+
 namespace ryujin
 {
   /**
@@ -46,9 +48,6 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
 
-    static constexpr auto n_precomputation_cycles =
-        View::n_precomputation_cycles;
-
     //@}
     /**
      * @name Constructor and setup
@@ -59,6 +58,7 @@ namespace ryujin
      * Constructor
      */
     SolutionTransfer(const MPI_Comm &mpi_communicator,
+                     Discretization<dim>::Triangulation &triangulation,
                      const OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
                      const ParabolicSystem &parabolic_system);
@@ -112,25 +112,15 @@ namespace ryujin
 
     const MPI_Comm &mpi_communicator_;
 
+    dealii::SmartPointer<typename Discretization<dim>::Triangulation>
+        triangulation_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
 
+    const StateVector *old_state_vector_;
     unsigned int handle;
 
     void register_data_attach();
-
-#if 0
-    std::vector<char> pack_callback(const cell_iterator &cell,
-                                    const dealii::CellStatus status);
-
-    void unpack_callback(
-        const cell_iterator &cell,
-        const dealii::CellStatus status,
-        const boost::iterator_range<std::vector<char>::const_iterator>
-            &data_range,
-        std::vector<VectorType *> &all_out,
-        VectorType &valence);
-#endif
   };
 } // namespace ryujin
