@@ -163,7 +163,6 @@ namespace ryujin
 
     handle = triangulation_->register_data_attach(
         [this](const auto cell, const dealii::CellStatus status) {
-
           const auto &dof_handler = offline_data_->dof_handler();
           const auto dof_cell = typename dealii::DoFHandler<dim>::cell_iterator(
               &cell->get_triangulation(),
@@ -181,7 +180,7 @@ namespace ryujin
           const auto n_dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
           std::vector<state_type> state_values(n_dofs_per_cell);
 
-          switch(status) {
+          switch (status) {
           case dealii::CellStatus::cell_will_persist:
             [[fallthrough]];
           case dealii::CellStatus::cell_will_be_refined: {
@@ -215,10 +214,9 @@ namespace ryujin
                 dealii::update_values | dealii::update_JxW_values |
                     dealii::update_quadrature_points);
 
-            dealii::FEPointEvaluation<1, dim> evaluator(
-                mapping,
-                finite_element,
-                dealii::update_values | dealii::update_JxW_values);
+            const auto poly =
+                dealii::internal::FEPointEvaluation::get_polynomial_space(
+                    finite_element);
             std::vector<dealii::Point<dim>> unit_points(quadrature.size());
 
             /*
@@ -229,35 +227,49 @@ namespace ryujin
 
             /* Step 1: build up right hand side by iterating over children: */
 
-            std::vector<state_type> state_values(quadrature.size());
-            dealii::Vector<double> local_values(n_dofs_per_cell);
-            dealii::Vector<double> local_rhs(n_dofs_per_cell);
+            std::vector<state_type> state_values_quad(quadrature.size());
+            std::vector<state_type> local_rhs(n_dofs_per_cell);
 
-            for (unsigned int child = 0; child < dof_cell->n_children(); ++child) {
-
+            for (unsigned int child = 0; child < dof_cell->n_children();
+                 ++child) {
               fe_values.reinit(dof_cell->child(child));
-
               mapping.transform_points_real_to_unit_cell(
                   dof_cell, fe_values.get_quadrature_points(), unit_points);
 
               for (unsigned int q = 0; q < quadrature.size(); ++q) {
                 for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
                   const auto U_i = U.get_tensor(i);
-                  state_values[q] += U_i * fe_values.shape_value(i, q);
+                  state_values_quad[q] += U_i * fe_values.shape_value(i, q);
                 }
               }
 
-//               evaluator.reinit(cell, unit_points);
-//               for (unsigned int q = 0; q < quadrature.size(); ++q) {
-//                 evaluator.submit_value(state_values[q] * fe_values.JxW(q), q);
-//               }
-//               evaluator.test_and_sum(local_values,
-//                                      dealii::EvaluationFlags::values);
-//               for (unsigned int i = 0; i < n_dofs_per_cell; ++i)
-//                 local_rhs(i) += local_values(i);
+              for (unsigned int q = 0; q < quadrature.size(); ++q) {
+                const unsigned int n_shapes = poly.size();
+                AssertIndexRange(n_shapes, 10);
+                dealii::ndarray<Number, 10, 2, dim> shapes;
+                // Evaluate 1d polynomials and their derivatives
+                std::array<Number, dim> point;
+                for (unsigned int d = 0; d < dim; ++d)
+                  point[d] = unit_points[q][d];
+                for (unsigned int i = 0; i < n_shapes; ++i)
+                  poly[i].values_of_array(point, 1, &shapes[i][0]);
+
+                Assert(finite_element.degree == 1, dealii::ExcNotImplemented());
+
+                dealii::internal::integrate_tensor_product_value<
+                    /*is_linear*/ true,
+                    dim,
+                    Number,
+                    state_type>(shapes.data(),
+                                n_shapes,
+                                state_values_quad[q] * fe_values.JxW(q),
+                                local_rhs.data(),
+                                unit_points[q],
+                                true);
+              }
             }
 
-            /* Step 2: solve with mass matrix on coarse cell: */
+            /* Step 2: solve with inverse mass matrix on coarse cell: */
 
             fe_values.reinit(dof_cell);
 
@@ -273,47 +285,24 @@ namespace ryujin
                 mi(i) += sum;
               }
             }
-#if 0
 
             mij.gauss_jordan();
-            mij.vmult(local_values, local_rhs);
-            // for (unsigned int i = 0; i < fe.dofs_per_cell; ++i)
-            //   local_values(i) = local_rhs(i) / mi(i);
-#endif
+
+            for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
+              for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
+                state_values[i] += mij(i, j) * local_rhs[j];
+              }
+            }
           } break;
 
-            case dealii::CellStatus::cell_invalid:
-              Assert(false, dealii::ExcInternalError());
-              __builtin_trap();
-              break;
-            }
+          case dealii::CellStatus::cell_invalid:
+            Assert(false, dealii::ExcInternalError());
+            __builtin_trap();
+            break;
+          }
 
           return pack_state_values(state_values);
         },
         /* returns_variable_size_data =*/false);
   }
 } // namespace ryujin
-
-
-#if 0
-    // create buffer for each individual object
-    std::vector<::dealii::Vector<typename VectorType::value_type>> dof_values(
-        input_vectors.size());
-
-    const unsigned int dofs_per_cell =
-        dof_handler->get_fe(fe_index).n_dofs_per_cell();
-
-    if (dofs_per_cell == 0)
-      return {}; // nothing to do for FE_Nothing
-
-    auto it_input = input_vectors.cbegin();
-    auto it_output = dof_values.begin();
-    for (; it_input != input_vectors.cend(); ++it_input, ++it_output) {
-      it_output->reinit(dofs_per_cell);
-      cell->get_interpolated_dof_values(*(*it_input), *it_output, fe_index);
-    }
-
-    return pack_dof_values<typename VectorType::value_type>(dof_values,
-                                                            dofs_per_cell);
-  }
-#endif
