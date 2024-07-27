@@ -1,6 +1,5 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception or LGPL-2.1-or-later
-// Copyright (C) 2007 - 2024 by the deal.II authors
 // Copyright (C) 2024 - 2024 by the ryujin authors
 //
 
@@ -43,7 +42,6 @@ namespace ryujin
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
-      , old_state_vector_(nullptr)
       , handle(dealii::numbers::invalid_unsigned_int)
 
   {
@@ -51,65 +49,6 @@ namespace ryujin
                 dealii::ExcMessage(
                     "The SolutionTransfer class is not implemented for a "
                     "distributed::shared::Triangulation which we use in 1D"));
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void SolutionTransfer<Description, dim, Number>::
-      prepare_projection_and_serialization(const StateVector &old_state_vector)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "SolutionTransfer<Description, dim, "
-                 "Number>::prepare_projection_and_serialization()"
-              << std::endl;
-#endif
-
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
-    old_state_vector_ = &old_state_vector;
-    register_data_attach();
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void SolutionTransfer<Description, dim, Number>::project(
-      StateVector &new_state_vector [[maybe_unused]])
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "SolutionTransfer<Description, dim, Number>::deserialize()"
-              << std::endl;
-#endif
-
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
-    Assert(false, dealii::ExcNotImplemented());
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void SolutionTransfer<Description, dim, Number>::deserialize(
-      StateVector &new_state_vector)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "SolutionTransfer<Description, dim, Number>::deserialize()"
-              << std::endl;
-#endif
-
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
-    register_data_attach();
-    project(new_state_vector);
-
-    Assert(false, dealii::ExcNotImplemented());
   }
 
 
@@ -171,8 +110,20 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void SolutionTransfer<Description, dim, Number>::register_data_attach()
+  void SolutionTransfer<Description, dim, Number>::prepare_projection(
+      const StateVector &old_state_vector)
   {
+#ifdef DEBUG_OUTPUT
+    std::cout
+        << "SolutionTransfer<Description, dim, Number>::prepare_projection()"
+        << std::endl;
+#endif
+
+    AssertThrow(have_distributed_triangulation<dim>,
+                dealii::ExcMessage(
+                    "The SolutionTransfer class is not implemented for a "
+                    "distributed::shared::Triangulation which we use in 1D"));
+
     const auto &discretization = offline_data_->discretization();
     const auto &triangulation = discretization.triangulation();
     Assert(triangulation_ == &triangulation,
@@ -184,8 +135,13 @@ namespace ryujin
            dealii::ExcMessage(
                "You can only add one solution per SolutionTransfer object."));
 
+    /*
+     * Add a register_data_attach callback that
+     */
+
     handle = triangulation_->register_data_attach(
-        [this](const auto cell, const dealii::CellStatus status) {
+        [this, &old_state_vector](const auto cell,
+                                  const dealii::CellStatus status) {
           const auto &dof_handler = offline_data_->dof_handler();
           const auto dof_cell = typename dealii::DoFHandler<dim>::cell_iterator(
               &cell->get_triangulation(),
@@ -193,8 +149,7 @@ namespace ryujin
               cell->index(),
               &dof_handler);
 
-          Assert(old_state_vector_ != nullptr, dealii::ExcInternalError());
-          const auto &U = std::get<0>(*old_state_vector_);
+          const auto &U = std::get<0>(old_state_vector);
 
           /*
            * Collect values for packing:
@@ -329,5 +284,21 @@ namespace ryujin
           return pack_state_values(state_values);
         },
         /* returns_variable_size_data =*/false);
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void SolutionTransfer<Description, dim, Number>::project(
+      StateVector &new_state_vector [[maybe_unused]])
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "SolutionTransfer<Description, dim, Number>::project()"
+              << std::endl;
+#endif
+
+    AssertThrow(have_distributed_triangulation<dim>,
+                dealii::ExcMessage(
+                    "The SolutionTransfer class is not implemented for a "
+                    "distributed::shared::Triangulation which we use in 1D"));
   }
 } // namespace ryujin

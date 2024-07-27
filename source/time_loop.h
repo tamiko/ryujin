@@ -103,7 +103,7 @@ namespace ryujin
      * serialization.
      *
      * @pre the state_vector has to have been prepared prior to a call to
-     * write_chckpoint().
+     * write_checkpoint().
      */
     void write_checkpoint(const StateVector &state_vector,
                           const std::string &base_name,

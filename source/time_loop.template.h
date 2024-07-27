@@ -495,32 +495,18 @@ namespace ryujin
     prepare_compute_kernels();
 
     /*
-     * Now read in the state vector:
-     */
-
-    Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
-
-    SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_communicator_,
-        /* for write access: */ discretization_.triangulation(),
-        offline_data_,
-        hyperbolic_system_,
-        parabolic_system_);
-
-    solution_transfer.deserialize(state_vector);
-
-    /*
      * Read in and broadcast metadata:
      */
 
     std::string name = base_name + "-checkpoint";
 
+    unsigned int transfer_handle;
     if (mpi_ensemble_.ensemble_rank() == 0) {
       std::string meta = name + ".metadata";
 
       std::ifstream file(meta, std::ios::binary);
       boost::archive::binary_iarchive ia(file);
-      ia >> t >> output_cycle;
+      ia >> t >> output_cycle >> transfer_handle;
     }
 
     int ierr;
@@ -539,8 +525,28 @@ namespace ryujin
                      mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
 
-    ierr = MPI_Barrier(mpi_communicator_);
+    ierr = MPI_Bcast(&transfer_handle,
+                     1,
+                     MPI_UNSIGNED,
+                     0,
+                     mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
+
+    /*
+     * Now read in the state vector:
+     */
+
+    Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
+
+    SolutionTransfer<Description, dim, Number> solution_transfer(
+        mpi_ensemble_.ensemble_communicator(),
+        /* we need write access: */ discretization_.triangulation(),
+        offline_data_,
+        hyperbolic_system_,
+        parabolic_system_);
+
+    solution_transfer.set_handle(transfer_handle);
+    solution_transfer.project(state_vector);
   }
 
 
@@ -565,13 +571,15 @@ namespace ryujin
      */
 
     SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_communicator_,
-        /* for write access: */ discretization_.triangulation(),
+        mpi_ensemble_,
+        /* we need write access: */ discretization_.triangulation(),
         offline_data_,
         hyperbolic_system_,
         parabolic_system_);
 
-    solution_transfer.prepare_projection_and_serialization(state_vector);
+    /* need hyperbolic_module.prepare_state_vector() prior to this call: */
+    solution_transfer.prepare_projection(state_vector);
+    const auto transfer_handle = solution_transfer.get_handle();
 
     std::string name = base_name + "-checkpoint";
 
@@ -599,7 +607,7 @@ namespace ryujin
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);
-      oa << t << output_cycle;
+      oa << t << output_cycle << transfer_handle;
     }
 
     const int ierr = MPI_Barrier(mpi_ensemble_.ensemble_communicator());
@@ -633,13 +641,14 @@ namespace ryujin
      */
 
     SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_communicator_,
-        /* for write access: */ discretization_.triangulation(),
+        mpi_ensemble_,
+        /* we need write access: */ discretization_.triangulation(),
         offline_data_,
         hyperbolic_system_,
         parabolic_system_);
 
-    solution_transfer.prepare_projection_and_serialization(state_vector);
+    /* need hyperbolic_module.prepare_state_vector() prior to this call: */
+    solution_transfer.prepare_projection(state_vector);
 
     /*
      * Execute mesh adaptation and project old state to new state vector:
