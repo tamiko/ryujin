@@ -47,6 +47,7 @@ namespace ryujin
     using state_type = typename View::state_type;
 
     using StateVector = typename View::StateVector;
+    using HyperbolicVector = typename View::HyperbolicVector;
 
     //@}
     /**
@@ -120,6 +121,17 @@ namespace ryujin
 
     const StateVector *old_state_vector_;
     unsigned int handle;
+
+    /**
+     * For the local mass projection to work properly we need to repopulate
+     * constrained degrees of freedom. Ordinarily this would happen with
+     * AffineConstraints<>::distribute() - but this function can not work
+     * on our MultiComponentVector. So we implement a small helper to do
+     * the operation by hand.
+     */
+    state_type
+    get_tensor_with_constraints_distributed(const HyperbolicVector &U,
+                                            const unsigned int local_index);
 
     void register_data_attach();
   };

@@ -148,6 +148,29 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
+  inline DEAL_II_ALWAYS_INLINE auto SolutionTransfer<Description, dim, Number>::
+      get_tensor_with_constraints_distributed(const HyperbolicVector &U,
+                                              const unsigned int local_i)
+          -> state_type
+  {
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    const auto &affine_constraints = offline_data_->affine_constraints();
+    const auto global_i = scalar_partitioner->local_to_global(local_i);
+    if (affine_constraints.is_constrained(global_i)) {
+      state_type result;
+      const auto &line = *affine_constraints.get_constraint_entries(global_i);
+      for (const auto &[global_k, c_k] : line) {
+        const auto local_k = scalar_partitioner->global_to_local(global_k);
+        result += c_k * U.get_tensor(local_k);
+      }
+      return result;
+    } else {
+      return U.get_tensor(local_i);
+    }
+  }
+
+
+  template <typename Description, int dim, typename Number>
   void SolutionTransfer<Description, dim, Number>::register_data_attach()
   {
     const auto &discretization = offline_data_->discretization();
@@ -194,7 +217,8 @@ namespace ryujin
                            std::end(dof_indices),
                            std::begin(state_values),
                            [&](const auto i) {
-                             const auto U_i = U.get_tensor(i);
+                             const auto U_i =
+                                 get_tensor_with_constraints_distributed(U, i);
                              return U_i;
                            });
           } break;
@@ -238,7 +262,8 @@ namespace ryujin
 
               for (unsigned int q = 0; q < quadrature.size(); ++q) {
                 for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
-                  const auto U_i = U.get_tensor(i);
+                  const auto U_i =
+                      get_tensor_with_constraints_distributed(U, i);
                   state_values_quad[q] += U_i * fe_values.shape_value(i, q);
                 }
               }
