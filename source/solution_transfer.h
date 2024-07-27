@@ -48,6 +48,8 @@ namespace ryujin
     using StateVector = typename View::StateVector;
     using HyperbolicVector = typename View::HyperbolicVector;
 
+    using ScalarVector = Vectors::ScalarVector<Number>;
+
     //@}
     /**
      * @name Constructor and setup
@@ -90,7 +92,8 @@ namespace ryujin
      *
      * @pre Can only be called after a call to prepare_projection().
      */
-    unsigned int get_handle() const {
+    unsigned int get_handle() const
+    {
       Assert(handle_ != dealii::numbers::invalid_unsigned_int,
              dealii::ExcMessage("Invalid handle: Cannot retrieve a valid "
                                 "handle because get_handle() can only be "
@@ -143,17 +146,28 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
 
-    unsigned int handle;
+    unsigned int handle_;
 
     /**
-     * For the local mass projection to work properly we need to repopulate
-     * constrained degrees of freedom. Ordinarily this would happen with
-     * AffineConstraints<>::distribute() - but this function can not work
-     * on our MultiComponentVector. So we implement a small helper to do
-     * the operation by hand.
+     * Helper function reading in a state from the hyperbolic state vector.
+     * The function translates the global index @p global_i into the local
+     * range (operated on by this MPI rank) and automatically distributes
+     * values to constrained degrees of freedom.
+     *
+     * @note Ordinarily distribute()ing constrained degrees of freedom
+     * would happen with AffineConstraints<>::distribute() - but this
+     * function is incompatible with our MultiComponentVector.
      */
-    state_type
-    get_tensor_with_constraints_distributed(const HyperbolicVector &U,
-                                            const unsigned int local_index);
+    state_type get_tensor(const HyperbolicVector &U,
+                          const dealii::types::global_dof_index global_i);
+
+    /**
+     * Helper function adding a supplied state to the hyperbolic state
+     * vector. The function translates the global index @p global_i into
+     * the local range (operated on by this MPI rank).
+     */
+    void add_tensor(HyperbolicVector &U,
+                    const state_type &U_i,
+                    const dealii::types::global_dof_index global_i);
   };
 } // namespace ryujin
