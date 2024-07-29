@@ -138,7 +138,7 @@ namespace ryujin
                     "distributed::shared::Triangulation which we use in 1D"));
 
     const auto &discretization = offline_data_->discretization();
-    const auto &triangulation = discretization.triangulation();
+    const auto &triangulation [[maybe_unused]] = discretization.triangulation();
     Assert(triangulation_ == &triangulation,
            dealii::ExcMessage(
                "The attached triangulation object must be the same object that "
@@ -330,7 +330,7 @@ namespace ryujin
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto &discretization = offline_data_->discretization();
-    const auto &triangulation = discretization.triangulation();
+    const auto &triangulation [[maybe_unused]] = discretization.triangulation();
     Assert(triangulation_ == &triangulation,
            dealii::ExcMessage(
                "The attached triangulation object must be the same object that "
