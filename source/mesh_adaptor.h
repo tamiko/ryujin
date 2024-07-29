@@ -32,6 +32,11 @@ namespace ryujin
      * useful for debugging and testing.
      */
     random_adaptation,
+
+    /**
+     * Perform local refinement and coarsening based on Kelly error estimator.
+     */
+    kelly_estimator,
   };
 
   /**
@@ -58,15 +63,20 @@ namespace ryujin
      * Perform a mesh adaptation cycle at preselected fixed time points.
      */
     fixed_adaptation_time_points,
+
+    /**
+     * Perform a mesh adaptation cycle at every nth simulation cycle.
+     */
+    simulation_cycle_based,
   };
 } // namespace ryujin
 
 #ifndef DOXYGEN
-DECLARE_ENUM(ryujin::AdaptationStrategy,
-             LIST({ryujin::AdaptationStrategy::global_refinement,
-                   "global refinement"},
-                  {ryujin::AdaptationStrategy::random_adaptation,
-                   "random adaptation"}, ));
+DECLARE_ENUM(
+    ryujin::AdaptationStrategy,
+    LIST({ryujin::AdaptationStrategy::global_refinement, "global refinement"},
+         {ryujin::AdaptationStrategy::random_adaptation, "random adaptation"},
+         {ryujin::AdaptationStrategy::kelly_estimator, "kelly estimator"}, ));
 
 DECLARE_ENUM(ryujin::MarkingStrategy,
              LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"}, ));
@@ -74,7 +84,9 @@ DECLARE_ENUM(ryujin::MarkingStrategy,
 DECLARE_ENUM(
     ryujin::TimePointSelectionStrategy,
     LIST({ryujin::TimePointSelectionStrategy::fixed_adaptation_time_points,
-          "fixed adaptation time points"}, ));
+          "fixed adaptation time points"},
+         {ryujin::TimePointSelectionStrategy::simulation_cycle_based,
+          "simulation cycle based"}, ));
 #endif
 
 namespace ryujin
@@ -119,6 +131,7 @@ namespace ryujin
                 const OfflineData<dim, Number> &offline_data,
                 const HyperbolicSystem &hyperbolic_system,
                 const ParabolicSystem &parabolic_system,
+                const ScalarVector &alpha,
                 const std::string &subsection = "/MeshAdaptor");
 
     /**
@@ -165,10 +178,13 @@ namespace ryujin
 
     TimePointSelectionStrategy time_point_selection_strategy_;
     std::vector<Number> adaptation_time_points_;
+    unsigned int adaptation_simulation_cycle_;
+
+    std::vector<std::string> kelly_options_;
 
     //@}
     /**
-     * @name Internal data
+     * @name Internal fields and methods
      */
     //@{
 
@@ -180,7 +196,20 @@ namespace ryujin
 
     bool need_mesh_adaptation_;
 
+    /* random adaptation: */
+
     mutable std::mt19937_64 mersenne_twister_;
+
+    /* kelly estimator: */
+
+    const ScalarVector &alpha_;
+
+    std::vector<ScalarVector> kelly_quantities_;
+    std::vector<
+        std::tuple<std::string /*name*/,
+                   std::function<void(ScalarVector & /*result*/,
+                                      const StateVector & /*state_vector*/)>>>
+        quantities_mapping_;
     //@}
   };
 
