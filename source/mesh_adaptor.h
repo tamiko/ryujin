@@ -62,12 +62,12 @@ namespace ryujin
     /**
      * Perform a mesh adaptation cycle at preselected fixed time points.
      */
-    fixed_adaptation_time_points,
+    fixed_time_points,
 
     /**
      * Perform a mesh adaptation cycle at every nth simulation cycle.
      */
-    simulation_cycle_based,
+    simulation_cycle,
   };
 } // namespace ryujin
 
@@ -81,12 +81,11 @@ DECLARE_ENUM(
 DECLARE_ENUM(ryujin::MarkingStrategy,
              LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"}, ));
 
-DECLARE_ENUM(
-    ryujin::TimePointSelectionStrategy,
-    LIST({ryujin::TimePointSelectionStrategy::fixed_adaptation_time_points,
-          "fixed adaptation time points"},
-         {ryujin::TimePointSelectionStrategy::simulation_cycle_based,
-          "simulation cycle based"}, ));
+DECLARE_ENUM(ryujin::TimePointSelectionStrategy,
+             LIST({ryujin::TimePointSelectionStrategy::fixed_time_points,
+                   "fixed time points"},
+                  {ryujin::TimePointSelectionStrategy::simulation_cycle,
+                   "simulation cycle"}, ));
 #endif
 
 namespace ryujin
@@ -109,13 +108,15 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
     using ParabolicSystem = typename Description::ParabolicSystem;
 
+    using Triangulation = typename Discretization<dim>::Triangulation;
+
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
     using StateVector = typename View::StateVector;
-
+    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
     using ScalarVector = Vectors::ScalarVector<Number>;
 
     //@}
@@ -131,6 +132,7 @@ namespace ryujin
                 const OfflineData<dim, Number> &offline_data,
                 const HyperbolicSystem &hyperbolic_system,
                 const ParabolicSystem &parabolic_system,
+                const InitialPrecomputedVector &initial_precomputed,
                 const ScalarVector &alpha,
                 const std::string &subsection = "/MeshAdaptor");
 
@@ -141,8 +143,9 @@ namespace ryujin
     void prepare(const Number t);
 
     /**
-     * Analyze the given StateVector with the configured adaptation strategy
-     * and decide whether a mesh adaptation cycle should be performed.
+     * Analyze the given StateVector with the configured adaptation
+     * strategy and time point selection strategy and decide whether a mesh
+     * adaptation cycle should be performed.
      */
     void analyze(const StateVector &state_vector,
                  const Number t,
@@ -157,11 +160,11 @@ namespace ryujin
     ACCESSOR_READ_ONLY(need_mesh_adaptation)
 
     /**
-     * Mark cells for coarsening and refinement with the configured marking
-     * strategy.
+     * Mark cells for coarsening and refinement with the configured mesh
+     * adaptation and marking strategies.
      */
     void mark_cells_for_coarsening_and_refinement(
-        dealii::Triangulation<dim> &triangulation) const;
+        Triangulation &triangulation) const;
 
   private:
     /**
@@ -175,12 +178,14 @@ namespace ryujin
     MarkingStrategy marking_strategy_;
     double fixed_number_refinement_fraction_;
     double fixed_number_coarsening_fraction_;
+    unsigned int min_refinement_level_;
+    unsigned int max_refinement_level_;
 
     TimePointSelectionStrategy time_point_selection_strategy_;
     std::vector<Number> adaptation_time_points_;
-    unsigned int adaptation_simulation_cycle_;
+    unsigned int adaptation_cycle_interval_;
 
-    std::vector<std::string> kelly_options_;
+    std::vector<std::string> kelly_quantities_;
 
     //@}
     /**
@@ -196,20 +201,23 @@ namespace ryujin
 
     bool need_mesh_adaptation_;
 
+    mutable dealii::Vector<float> indicators_;
+
     /* random adaptation: */
+
+    void compute_random_indicators() const;
 
     mutable std::mt19937_64 mersenne_twister_;
 
-    /* kelly estimator: */
+    /* Kelly estimator: */
 
+    void populate_kelly_quantities(const StateVector &state_vector) const;
+    void compute_kelly_indicators() const;
+
+    const InitialPrecomputedVector &initial_precomputed_;
     const ScalarVector &alpha_;
 
-    std::vector<ScalarVector> kelly_quantities_;
-    std::vector<
-        std::tuple<std::string /*name*/,
-                   std::function<void(ScalarVector & /*result*/,
-                                      const StateVector & /*state_vector*/)>>>
-        quantities_mapping_;
+    mutable std::vector<ScalarVector> kelly_components_;
     //@}
   };
 

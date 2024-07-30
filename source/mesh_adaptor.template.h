@@ -6,6 +6,8 @@
 #pragma once
 
 #include "mesh_adaptor.h"
+#include "selected_components_extractor.h"
+
 #include <deal.II/base/array_view.h>
 #include <deal.II/grid/grid_refinement.h>
 #include <deal.II/numerics/error_estimator.h>
@@ -18,6 +20,7 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
+      const InitialPrecomputedVector &initial_precomputed,
       const ScalarVector &alpha,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
@@ -26,13 +29,14 @@ namespace ryujin
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , need_mesh_adaptation_(false)
+      , initial_precomputed_(initial_precomputed)
       , alpha_(alpha)
   {
     adaptation_strategy_ = AdaptationStrategy::global_refinement;
     add_parameter("adaptation strategy",
                   adaptation_strategy_,
                   "The chosen adaptation strategy. Possible values are: global "
-                  "refinement, random adaptation, local refinement");
+                  "refinement, random adaptation, kelly estimator");
 
     marking_strategy_ = MarkingStrategy::fixed_number;
     add_parameter(
@@ -41,11 +45,11 @@ namespace ryujin
         "The chosen marking strategy. Possible values are: fixed number");
 
     time_point_selection_strategy_ =
-        TimePointSelectionStrategy::fixed_adaptation_time_points;
+        TimePointSelectionStrategy::fixed_time_points;
     add_parameter("time point selection strategy",
                   time_point_selection_strategy_,
                   "The chosen time point selection strategy. Possible values "
-                  "are: fixed adaptation time points, simulation cycle based");
+                  "are: fixed time points, simulation cycle");
 
     /* Options for various adaptation strategies: */
     enter_subsection("adaptation strategies");
@@ -54,21 +58,11 @@ namespace ryujin
                   random_adaptation_mersenne_twister_seed_,
                   "Seed for 64bit Mersenne Twister used for random refinement");
 
-    std::copy(std::begin(View::component_names),
-              std::end(View::component_names),
-              std::back_inserter(kelly_options_));
-
-    std::copy(std::begin(View::initial_precomputed_names),
-              std::end(View::initial_precomputed_names),
-              std::back_inserter(kelly_options_));
-
-    kelly_options_ = {};
     add_parameter(
-        "Kelly indicators",
-        kelly_options_,
-        "List of conserved, primitive or precomputed  "
-        "quantities that will be used for the KellyErrorEstimator indicator "
-        "for refinement and coarsening.");
+        "kelly estimator: quantities",
+        kelly_quantities_,
+        "List of conserved, primitive or precomputed quantities that will be "
+        "used for the Kelly error estimator for refinement and coarsening.");
     leave_subsection();
 
     /* Options for various marking strategies: */
@@ -85,20 +79,33 @@ namespace ryujin
         "fixed number: coarsening fraction",
         fixed_number_coarsening_fraction_,
         "Fixed number strategy: fraction of cells selected for coarsening.");
+
+    min_refinement_level_ = 0;
+    add_parameter("minimal refinement level",
+                  min_refinement_level_,
+                  "Marking: minimal refinement level of cells that will be "
+                  "maintained while coarsening cells.");
+
+    max_refinement_level_ = 1000;
+    add_parameter("maximal refinement level",
+                  max_refinement_level_,
+                  "Marking: maximal refinement level of cells that will be "
+                  "maintained while refininig cells.");
+
     leave_subsection();
 
     /* Options for various time point selection strategies: */
 
     enter_subsection("time point selection strategies");
     adaptation_time_points_ = {};
-    add_parameter("adaptation timepoints",
+    add_parameter("fixed time points: time points",
                   adaptation_time_points_,
                   "List of time points in (simulation) time at which we will "
                   "perform a mesh adaptation cycle.");
 
-    adaptation_simulation_cycle_ = 5;
-    add_parameter("adaptation simulation cycle",
-                  adaptation_simulation_cycle_,
+    adaptation_cycle_interval_ = 5;
+    add_parameter("simulation cycle: interval",
+                  adaptation_cycle_interval_,
                   "The nth simulation cycle at which we will "
                   "perform mesh adapation.");
     leave_subsection();
@@ -121,7 +128,7 @@ namespace ryujin
 #endif
 
     if (time_point_selection_strategy_ ==
-        TimePointSelectionStrategy::fixed_adaptation_time_points) {
+        TimePointSelectionStrategy::fixed_time_points) {
       /* Remove outdated refinement timestamps: */
       const auto new_end = std::remove_if(
           adaptation_time_points_.begin(),
@@ -131,91 +138,84 @@ namespace ryujin
     }
 
     if (adaptation_strategy_ == AdaptationStrategy::kelly_estimator) {
-      /* Populate quantities mapping based on user-defined Kelly options: */
-
-      quantities_mapping_.clear();
-
-      for (const auto &entry : kelly_options_) {
-        /* Conserved quantities: */
-        {
-          constexpr auto &names = View::component_names;
-          const auto pos = std::find(std::begin(names), std::end(names), entry);
-          if (pos != std::end(names)) {
-            const auto index = std::distance(std::begin(names), pos);
-            quantities_mapping_.push_back(std::make_tuple(
-                entry,
-                [index](ScalarVector &result, const StateVector &state_vector) {
-                  const auto &U = std::get<0>(state_vector);
-                  U.extract_component(result, index);
-                }));
-            continue;
-          }
-        }
-
-        /* Primitive quantities: */
-        {
-          constexpr auto &names = View::primitive_component_names;
-          const auto pos = std::find(std::begin(names), std::end(names), entry);
-          if (pos != std::end(names)) {
-            const auto index = std::distance(std::begin(names), pos);
-            quantities_mapping_.push_back(std::make_tuple(
-                entry,
-                [this, index](ScalarVector &result,
-                              const StateVector &state_vector) {
-                  const auto &U = std::get<0>(state_vector);
-                  /*
-                   * FIXME: We might traverse the same vector multiple
-                   * times. This is inefficient.
-                   */
-                  const unsigned int n_owned = offline_data_->n_locally_owned();
-                  for (unsigned int i = 0; i < n_owned; ++i) {
-                    const auto view =
-                        hyperbolic_system_->template view<dim, Number>();
-                    result.local_element(i) =
-                        view.to_primitive_state(U.get_tensor(i))[index];
-                  }
-                }));
-            continue;
-          }
-        }
-
-        /* Precomputed quantities: */
-        {
-          constexpr auto &names = View::precomputed_names;
-          const auto pos = std::find(std::begin(names), std::end(names), entry);
-          if (pos != std::end(names)) {
-            const auto index = std::distance(std::begin(names), pos);
-            quantities_mapping_.push_back(std::make_tuple(
-                entry,
-                [index](ScalarVector &result, const StateVector &state_vector) {
-                  const auto &precomputed = std::get<1>(state_vector);
-                  precomputed.extract_component(result, index);
-                }));
-            continue;
-          }
-        }
-
-        /* Special indicator value: */
-        if (entry == "alpha") {
-          quantities_mapping_.push_back(std::make_tuple(
-              entry, [this](ScalarVector &result, const StateVector &) {
-                result = alpha_;
-              }));
-          continue;
-        }
-
-        AssertThrow(
-            false,
-            dealii::ExcMessage("Invalid component name »" + entry + "«"));
-      }
-
-      kelly_quantities_.resize(quantities_mapping_.size());
-      for (auto &it : kelly_quantities_)
-        it.reinit(offline_data_->scalar_partitioner());
+      SelectedComponentsExtractor<Description, dim, Number>::check(
+          kelly_quantities_);
     }
 
     /* toggle mesh adaptation flag to off. */
     need_mesh_adaptation_ = false;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void MeshAdaptor<Description, dim, Number>::compute_random_indicators() const
+  {
+    std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
+      static std::uniform_real_distribution<double> distribution(0.0, 10.0);
+      return distribution(mersenne_twister_);
+    });
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void MeshAdaptor<Description, dim, Number>::populate_kelly_quantities(
+      const StateVector &state_vector) const
+  {
+    /* Populate Kelly quantities: */
+    const auto &affine_constraints = offline_data_->affine_constraints();
+
+    kelly_components_ =
+        SelectedComponentsExtractor<Description, dim, Number>::extract(
+            *hyperbolic_system_,
+            state_vector,
+            initial_precomputed_,
+            alpha_,
+            kelly_quantities_);
+
+    for (auto &it : kelly_components_) {
+      affine_constraints.distribute(it);
+      it.update_ghost_values();
+    }
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void MeshAdaptor<Description, dim, Number>::compute_kelly_indicators() const
+  {
+    /*
+     * Calculate a Kelly error estimator for each configured quantitity:
+     */
+
+    std::vector<dealii::Vector<float>> kelly_errors;
+    std::vector<dealii::Vector<float> *> ptr_kelly_errors;
+
+    const auto size = indicators_.size();
+    kelly_errors.resize(kelly_components_.size());
+
+    for (auto &it : kelly_errors) {
+      it.reinit(size);
+      ptr_kelly_errors.push_back(&it);
+    }
+
+    auto array_view_kelly_errors = dealii::make_array_view(ptr_kelly_errors);
+    std::vector<const dealii::ReadVector<Number> *> ptr_kelly_components;
+    for (const auto &it : kelly_components_)
+      ptr_kelly_components.push_back(&it);
+
+    const auto array_view_kelly_components =
+        dealii::make_array_view(ptr_kelly_components);
+
+    dealii::KellyErrorEstimator<dim>::estimate(
+        offline_data_->discretization().mapping(),
+        offline_data_->dof_handler(),
+        offline_data_->discretization().face_quadrature(),
+        {},
+        array_view_kelly_components,
+        array_view_kelly_errors);
+
+    indicators_ = 0.;
+    for (const auto &it : kelly_errors)
+      indicators_ += it;
   }
 
 
@@ -227,8 +227,13 @@ namespace ryujin
     std::cout << "MeshAdaptor<dim, Number>::analyze()" << std::endl;
 #endif
 
+    /*
+     * Decide whether we perform an adaptation cycle with the chosen time
+     * point selection strategy:
+     */
+
     switch (time_point_selection_strategy_) {
-    case TimePointSelectionStrategy::fixed_adaptation_time_points: {
+    case TimePointSelectionStrategy::fixed_time_points: {
       /* Remove all refinement points from the vector that lie in the past: */
       const auto new_end = std::remove_if( //
           adaptation_time_points_.begin(),
@@ -241,9 +246,10 @@ namespace ryujin
           });
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
     } break;
-    case TimePointSelectionStrategy::simulation_cycle_based: {
-      /* Check if simulation time cycle modulo adaptation_time_cycle_  = 0 */
-      if (cycle % adaptation_simulation_cycle_ == 0)
+
+    case TimePointSelectionStrategy::simulation_cycle: {
+      /* check whether we reached a cycle interval: */
+      if (cycle % adaptation_cycle_interval_ == 0)
         need_mesh_adaptation_ = true;
     } break;
 
@@ -252,28 +258,26 @@ namespace ryujin
       __builtin_trap();
     }
 
+    if (!need_mesh_adaptation_)
+      return;
+
+    /*
+     * Some adaptation strategies require us to prepare some internal
+     * data fields:
+     */
+
     switch (adaptation_strategy_) {
     case AdaptationStrategy::global_refinement:
-      // do nothing
+      /* do nothing */
       break;
-    case AdaptationStrategy::random_adaptation:
-      // do nothing
-      break;
-    case AdaptationStrategy::kelly_estimator: {
-      /* Populate Kelly quantities: */
-      {
-        const auto &affine_constraints = offline_data_->affine_constraints();
 
-        Assert(kelly_quantities_.size() == quantities_mapping_.size(),
-               dealii::ExcInternalError());
-        for (unsigned int d = 0; d < kelly_quantities_.size(); ++d) {
-          const auto &lambda = std::get<1>(quantities_mapping_[d]);
-          lambda(kelly_quantities_[d], state_vector);
-          affine_constraints.distribute(kelly_quantities_[d]);
-          kelly_quantities_[d].update_ghost_values();
-        }
-      }
-    } break;
+    case AdaptationStrategy::random_adaptation:
+      /* do nothing */
+      break;
+
+    case AdaptationStrategy::kelly_estimator:
+      populate_kelly_quantities(state_vector);
+      break;
 
     default:
       AssertThrow(false, dealii::ExcInternalError());
@@ -285,7 +289,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void MeshAdaptor<Description, dim, Number>::
       mark_cells_for_coarsening_and_refinement(
-          dealii::Triangulation<dim> &triangulation) const
+          Triangulation &triangulation) const
   {
     auto &discretization [[maybe_unused]] = offline_data_->discretization();
     Assert(&triangulation == &discretization.triangulation(),
@@ -294,8 +298,6 @@ namespace ryujin
     /*
      * Compute an indicator with the chosen adaptation strategy:
      */
-
-    dealii::Vector<float> indicators;
 
     switch (adaptation_strategy_) {
     case AdaptationStrategy::global_refinement: {
@@ -306,47 +308,13 @@ namespace ryujin
     } break;
 
     case AdaptationStrategy::random_adaptation: {
-      indicators.reinit(triangulation.n_active_cells());
-      std::generate(std::begin(indicators), std::end(indicators), [&]() {
-        static std::uniform_real_distribution<double> distribution(0.0, 10.0);
-        return distribution(mersenne_twister_);
-      });
+      indicators_.reinit(triangulation.n_active_cells());
+      compute_random_indicators();
     } break;
 
     case AdaptationStrategy::kelly_estimator: {
-
-      /* Calcuator the KellyErrorEstimator for each defined quantitity */
-      std::vector<dealii::Vector<float>> kelly_errors;
-      std::vector<dealii::Vector<float> *> ptr_kelly_errors;
-
-      kelly_errors.resize(quantities_mapping_.size());
-      for (auto &it : kelly_errors) {
-        it.reinit(triangulation.n_active_cells());
-        ptr_kelly_errors.push_back(&it);
-      }
-
-      auto array_view_kelly_errors = dealii::make_array_view(ptr_kelly_errors);
-      std::vector<const dealii::ReadVector<Number> *> ptr_kelly_quantities;
-      for (const auto &it : kelly_quantities_) {
-        ptr_kelly_quantities.push_back(&it);
-      }
-      const auto array_view_kelly_quantities =
-          dealii::make_array_view(ptr_kelly_quantities);
-
-      /* Populate array_view_kelly_errors */
-      dealii::KellyErrorEstimator<dim>::estimate(
-          offline_data_->discretization().mapping(),
-          offline_data_->dof_handler(),
-          offline_data_->discretization().face_quadrature(),
-          {},
-          array_view_kelly_quantities,
-          array_view_kelly_errors);
-
-      /* Accumulate total error per cell */
-      indicators.reinit(triangulation.n_active_cells());
-      for (const auto &it : kelly_errors)
-        indicators += it;
-
+      indicators_.reinit(triangulation.n_active_cells());
+      compute_kelly_indicators();
     } break;
 
     default:
@@ -358,11 +326,14 @@ namespace ryujin
      * Mark cells with chosen marking strategy:
      */
 
+    Assert(indicators_.size() == triangulation.n_active_cells(),
+           dealii::ExcInternalError());
+
     switch (marking_strategy_) {
     case MarkingStrategy::fixed_number: {
       dealii::GridRefinement::refine_and_coarsen_fixed_number(
           triangulation,
-          indicators,
+          indicators_,
           fixed_number_refinement_fraction_,
           fixed_number_coarsening_fraction_);
     } break;
@@ -373,21 +344,17 @@ namespace ryujin
     }
 
     /*
-     * Constrain refinement and coarsening to maximum and minimum levels:
+     * Constrain refinement and coarsening to maximum and minimum
+     * refinement levels:
      */
-#if 0
-    unsigned int refinement_level = discretization.refinement(); // How to fix this line?
-    const unsigned int max_refinement_level = refinement_level + 2;
-    const unsigned int min_refinement_level = refinement_level - 1;
-    if (triangulation.n_levels() > max_refinement_level)
-      for (const auto &cell :
-           triangulation.active_cell_iterators_on_level(max_refinement_level))
-        cell->clear_refine_flag();
-    for (const auto &cell :
-         triangulation.active_cell_iterators_on_level(min_refinement_level))
-      cell->clear_coarsen_flag();
-#endif
 
-    return;
+    if (triangulation.n_levels() > max_refinement_level_)
+      for (const auto &cell :
+           triangulation.active_cell_iterators_on_level(max_refinement_level_))
+        cell->clear_refine_flag();
+
+    for (const auto &cell :
+         triangulation.active_cell_iterators_on_level(min_refinement_level_))
+      cell->clear_coarsen_flag();
   }
 } // namespace ryujin

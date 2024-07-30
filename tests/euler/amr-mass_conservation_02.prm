@@ -54,10 +54,10 @@ end
 
 subsection I - MeshAdaptor
   set adaptation strategy           = random adaptation
-  set time point selection strategy = fixed adaptation time points
+  set time point selection strategy = fixed time points
 
   subsection time point selection strategies
-    set adaptation timepoints = 0.5, 1.0, 1.5
+    set fixed time points: time points = 0.5, 1.0, 1.5
   end
 
   subsection marking strategies
