@@ -39,10 +39,10 @@ namespace ryujin
                   "refinement, random adaptation, kelly estimator");
 
     marking_strategy_ = MarkingStrategy::fixed_number;
-    add_parameter(
-        "marking strategy",
-        marking_strategy_,
-        "The chosen marking strategy. Possible values are: fixed number");
+    add_parameter("marking strategy",
+                  marking_strategy_,
+                  "The chosen marking strategy. Possible values are: fixed "
+                  "number, fixed fraction");
 
     time_point_selection_strategy_ =
         TimePointSelectionStrategy::fixed_time_points;
@@ -68,17 +68,15 @@ namespace ryujin
     /* Options for various marking strategies: */
 
     enter_subsection("marking strategies");
-    fixed_number_refinement_fraction_ = 0.3;
-    add_parameter(
-        "fixed number: refinement fraction",
-        fixed_number_refinement_fraction_,
-        "Fixed number strategy: fraction of cells selected for refinement.");
+    refinement_fraction_ = 0.3;
+    add_parameter("refinement fraction",
+                  refinement_fraction_,
+                  "Marking: fraction of cells selected for refinement.");
 
-    fixed_number_coarsening_fraction_ = 0.3;
-    add_parameter(
-        "fixed number: coarsening fraction",
-        fixed_number_coarsening_fraction_,
-        "Fixed number strategy: fraction of cells selected for coarsening.");
+    coarsening_fraction_ = 0.3;
+    add_parameter("coarsening fraction",
+                  coarsening_fraction_,
+                  "Marking: fraction of cells selected for coarsening.");
 
     min_refinement_level_ = 0;
     add_parameter("minimal refinement level",
@@ -92,13 +90,20 @@ namespace ryujin
                   "Marking: maximal refinement level of cells that will be "
                   "maintained while refininig cells.");
 
+    max_num_cells_ = 100000;
+    add_parameter(
+        "maximal number of cells",
+        max_num_cells_,
+        "Marking: maximal number of cells used for the fixed fraction "
+        "strategy. Note this is only an indicator and not strictly enforced.");
+
     leave_subsection();
 
     /* Options for various time point selection strategies: */
 
     enter_subsection("time point selection strategies");
     adaptation_time_points_ = {};
-    add_parameter("fixed time points: time points",
+    add_parameter("fixed time points",
                   adaptation_time_points_,
                   "List of time points in (simulation) time at which we will "
                   "perform a mesh adaptation cycle.");
@@ -334,8 +339,16 @@ namespace ryujin
       dealii::GridRefinement::refine_and_coarsen_fixed_number(
           triangulation,
           indicators_,
-          fixed_number_refinement_fraction_,
-          fixed_number_coarsening_fraction_);
+          refinement_fraction_,
+          coarsening_fraction_);
+    } break;
+    case MarkingStrategy::fixed_fraction: {
+      dealii::GridRefinement::refine_and_coarsen_fixed_fraction(
+          triangulation,
+          indicators_,
+          refinement_fraction_,
+          coarsening_fraction_,
+          max_num_cells_);
     } break;
 
     default:

@@ -51,6 +51,11 @@ namespace ryujin
      * Refine and coarsen a configurable selected percentage of cells.
      */
     fixed_number,
+    /**
+     * Refine and coarsen such that the criteria of cells getting flagged for
+     * refinement make up for a certain fraction of the total "error".
+     */
+    fixed_fraction,
   };
 
   /**
@@ -79,7 +84,9 @@ DECLARE_ENUM(
          {ryujin::AdaptationStrategy::kelly_estimator, "kelly estimator"}, ));
 
 DECLARE_ENUM(ryujin::MarkingStrategy,
-             LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"}, ));
+             LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"},
+                  {ryujin::MarkingStrategy::fixed_fraction,
+                   "fixed fraction"}, ));
 
 DECLARE_ENUM(ryujin::TimePointSelectionStrategy,
              LIST({ryujin::TimePointSelectionStrategy::fixed_time_points,
@@ -176,10 +183,11 @@ namespace ryujin
     std::uint_fast64_t random_adaptation_mersenne_twister_seed_;
 
     MarkingStrategy marking_strategy_;
-    double fixed_number_refinement_fraction_;
-    double fixed_number_coarsening_fraction_;
+    double refinement_fraction_;
+    double coarsening_fraction_;
     unsigned int min_refinement_level_;
     unsigned int max_refinement_level_;
+    unsigned int max_num_cells_;
 
     TimePointSelectionStrategy time_point_selection_strategy_;
     std::vector<Number> adaptation_time_points_;
