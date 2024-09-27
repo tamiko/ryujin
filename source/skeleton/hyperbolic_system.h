@@ -92,7 +92,6 @@ namespace ryujin
         return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
       }
 
-
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
