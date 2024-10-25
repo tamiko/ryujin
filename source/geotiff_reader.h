@@ -49,7 +49,7 @@ namespace ryujin
    *
    * @ingroup ShallowWaterEquations
    */
-  template <int dim, typename Number>
+  template <int dim>
   class GeoTIFFReader : dealii::ParameterAcceptor
   {
   public:
@@ -93,6 +93,12 @@ namespace ryujin
                           "GeoTIFF: choose base point for height normalization "
                           "that is set to 0.: none, minimum, average, maximum");
 
+      height_scaling_ = 1.0;
+      this->add_parameter("height scaling",
+                          height_scaling_,
+                          "GeoTIFF: choose base point for height normalization "
+                          "that is set to 0.: none, minimum, average, maximum");
+
       const auto set_up = [this] {
 #ifdef WITH_GDAL
         /* Initial GDAL and reset all data: */
@@ -112,7 +118,7 @@ namespace ryujin
     }
 
 
-    DEAL_II_ALWAYS_INLINE inline Number
+    DEAL_II_ALWAYS_INLINE inline double
     compute_height(const dealii::Point<dim> &point) const
     {
       geotiff_guard_.ensure_initialized([&]() {
@@ -168,7 +174,7 @@ namespace ryujin
       const auto v_jl = v_iljl * (1. - i_ratio) + v_irjl * i_ratio;
       const auto v_jr = v_iljr * (1. - i_ratio) + v_irjr * i_ratio;
 
-      return v_jl * (1. - j_ratio) + v_jr * j_ratio;
+      return height_scaling_ * (v_jl * (1. - j_ratio) + v_jr * j_ratio);
     }
 
     /*
@@ -179,6 +185,7 @@ namespace ryujin
 
     ACCESSOR_READ_ONLY(raster_size);
     ACCESSOR_READ_ONLY(raster_offset);
+    ACCESSOR_READ_ONLY(height_scaling);
 
   private:
     void read_in_raster() const
@@ -377,6 +384,7 @@ namespace ryujin
     bool transformation_use_geotiff_;
     bool transformation_use_geotiff_origin_;
     HeightNormalization height_normalization_;
+    double height_scaling_;
 
     /* GDAL data structures: */
 

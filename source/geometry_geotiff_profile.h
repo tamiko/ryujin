@@ -276,7 +276,7 @@ namespace ryujin
       }
 
     private:
-      GeoTIFFReader<dim, double> geotiff_reader_;
+      GeoTIFFReader<dim> geotiff_reader_;
 
       dealii::Point<dim> point_left_;
       dealii::Point<dim> point_right_;
