@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include <geotiff_reader.h>
 #include <initial_state_library.h>
 #include <lazy.h>
-#include <geotiff_reader.h>
 
 #include <deal.II/base/function_parser.h>
 
