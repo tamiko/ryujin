@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include <convenience_macros.h>
-#include <lazy.h>
+#include "convenience_macros.h"
+#include "lazy.h"
+#include "patterns_conversion.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <iomanip>
@@ -15,6 +16,28 @@
 #include <cpl_conv.h>
 #include <gdal.h>
 #include <gdal_priv.h>
+#endif
+
+namespace ryujin
+{
+  enum class HeightNormalization {
+    /** do not normalize the height: **/
+    none,
+    /** set minimum to zero: **/
+    minimum,
+    /** set average to zero: **/
+    average,
+    /** set maximum to zero: **/
+    maximum
+  };
+} // namespace ryujin
+
+#ifndef DOXYGEN
+DECLARE_ENUM(ryujin::HeightNormalization,
+             LIST({ryujin::HeightNormalization::none, "none"},
+                  {ryujin::HeightNormalization::minimum, "minimum"},
+                  {ryujin::HeightNormalization::average, "average"},
+                  {ryujin::HeightNormalization::maximum, "maximum"}));
 #endif
 
 namespace ryujin
@@ -63,6 +86,12 @@ namespace ryujin
           "lower left corner) from GeoTIFF for constructing "
           "the affine transformation. If set to false the origin specified "
           "in the transformation parameter will be used instead.");
+
+      height_normalization_ = HeightNormalization::minimum;
+      this->add_parameter("height normalization",
+                          height_normalization_,
+                          "GeoTIFF: choose base point for height normalization "
+                          "that is set to 0.: none, minimum, average, maximum");
 
       const auto set_up = [this] {
 #ifdef WITH_GDAL
@@ -147,6 +176,9 @@ namespace ryujin
      * GeoTIFF image.
      */
     ACCESSOR_READ_ONLY(affine_transformation);
+
+    ACCESSOR_READ_ONLY(raster_size);
+    ACCESSOR_READ_ONLY(raster_offset);
 
   private:
     void read_in_raster() const
@@ -289,6 +321,25 @@ namespace ryujin
       std::cout << std::endl;
 #endif
 
+      if (height_normalization_ != HeightNormalization::none) {
+        float shift = 0.;
+
+        if (height_normalization_ == HeightNormalization::minimum)
+          shift = *std::min_element(std::begin(raster_), std::end(raster_));
+        else if (height_normalization_ == HeightNormalization::maximum)
+          shift = *std::max_element(std::begin(raster_), std::end(raster_));
+        else {
+          Assert(height_normalization_ == HeightNormalization::average,
+                 dealii::ExcInternalError());
+          const auto sum = std::reduce(std::begin(raster_), std::end(raster_));
+          shift = sum / raster_.size();
+        }
+
+        std::for_each(std::begin(raster_),
+                      std::end(raster_),
+                      [&](auto &element) { element -= shift; });
+      }
+
 #else
       static constexpr auto message =
           "ryujin has to be configured with GDAL support in order to read in "
@@ -325,6 +376,7 @@ namespace ryujin
     std::array<double, 6> transformation_;
     bool transformation_use_geotiff_;
     bool transformation_use_geotiff_origin_;
+    HeightNormalization height_normalization_;
 
     /* GDAL data structures: */
 
