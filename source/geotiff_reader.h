@@ -99,7 +99,7 @@ namespace ryujin
                           "GeoTIFF: choose base point for height normalization "
                           "that is set to 0.: none, minimum, average, maximum");
 
-      const auto set_up = [this] {
+      const auto set_up = [&] {
 #ifdef WITH_GDAL
         /* Initial GDAL and reset all data: */
         GDALAllRegister();
