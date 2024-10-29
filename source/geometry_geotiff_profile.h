@@ -199,10 +199,15 @@ namespace ryujin
               continue;
             const auto position = face->center();
 
-            if (position[0] < point_left_[0] + 1.e-8)
+            if (position[0] < point_left_[0] + 1.e-8) {
               face->set_boundary_id(boundary_left_);
-            if (position[0] > point_right_[0] - 1.e-8)
+              face->set_manifold_id(dealii::numbers::flat_manifold_id);
+            }
+
+            if (position[0] > point_right_[0] - 1.e-8) {
               face->set_boundary_id(boundary_right_);
+              face->set_manifold_id(dealii::numbers::flat_manifold_id);
+            }
 
 
             if constexpr (dim == 2) {
@@ -218,17 +223,15 @@ namespace ryujin
             }
 
             if constexpr (dim == 3) {
-
-              /*
-               * In 3D the manifolds y = point_left_[1]) and y =
-               * point_right_[1] planes should be transfinite manifolds
-               */
-
-              if (position[1] < point_left_[1] + 1.e-8)
+              if (position[1] < point_left_[1] + 1.e-8) {
                 face->set_boundary_id(boundary_bottom_);
+                face->set_manifold_id(dealii::numbers::flat_manifold_id);
+              }
 
-              if (position[1] > point_right_[1] - 1.e-8)
+              if (position[1] > point_right_[1] - 1.e-8) {
                 face->set_boundary_id(boundary_top_);
+                face->set_manifold_id(dealii::numbers::flat_manifold_id);
+              }
 
               /*
                * The lower boundary at z = point_left_[2] is the profile
