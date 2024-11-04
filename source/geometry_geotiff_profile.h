@@ -35,7 +35,7 @@ namespace ryujin
 
         if constexpr (dim >= 2) {
           /* transform y-direction (2D) or z-direction (3D): */
-          chart_point[dim - 1] += callable_(space_point);
+          chart_point[dim - 1] -= callable_(space_point);
         }
 
         return chart_point;
@@ -48,7 +48,7 @@ namespace ryujin
 
         if constexpr (dim >= 2) {
           /* transform y-direction (2D) or z-direction (3D): */
-          space_point[dim - 1] -= callable_(space_point);
+          space_point[dim - 1] += callable_(space_point);
         }
 
         return space_point;
