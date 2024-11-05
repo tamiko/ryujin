@@ -50,7 +50,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::c(const Number gamma) const
+    RiemannSolver<dim, Number>::c(const Number &gamma) const
     {
       /*
        * We implement the continuous and monotonic function c(gamma) as
@@ -94,7 +94,7 @@ namespace ryujin
 
       const Number denominator = gamma - Number(1.);
 
-      return numerator / denominator;
+      return safe_division(numerator, denominator);
     }
 
 
@@ -143,7 +143,11 @@ namespace ryujin
       const Number numerator =
           positive_part(alpha_hat_min + alpha_max - (u_j - u_i));
 
-      const Number p_ratio = (p_min + pinf) / (p_max + pinf);
+      /*
+       * The admissible set is p_min >= pinf. But numerically let's avoid
+       * division by zero and ensure positivity:
+       */
+      const Number p_ratio = safe_division(p_min + pinf, p_max + pinf);
 
       /*
        * Here, we use a trick: The r-factor only shows up in the formula
@@ -168,8 +172,8 @@ namespace ryujin
           alpha_max;
 
       const Number p_1_tilde =
-          (p_max + pinf) *
-              ryujin::pow(numerator / first_denom, first_exponent_inverse) -
+          (p_max + pinf) * ryujin::pow(safe_division(numerator, first_denom),
+                                       first_exponent_inverse) -
           pinf;
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "RS p_1_tilde  = " << p_1_tilde << "\n";
@@ -189,8 +193,8 @@ namespace ryujin
           alpha_max * ryujin::pow(p_ratio, r_exponent);
 
       const Number p_2_tilde =
-          (p_max + pinf) *
-              ryujin::pow(numerator / second_denom, second_exponent_inverse) -
+          (p_max + pinf) * ryujin::pow(safe_division(numerator, second_denom),
+                                       second_exponent_inverse) -
           pinf;
 
 #ifdef DEBUG_RIEMANN_SOLVER
@@ -232,12 +236,13 @@ namespace ryujin
           positive_part(alpha_hat_i + alpha_hat_j - (u_j - u_i));
 
       const Number denominator =
-          alpha_hat_i * ryujin::pow((p_i + pinf) / (p_j + pinf), -exponent) +
+          alpha_hat_i *
+              ryujin::pow(safe_division(p_i + pinf, p_j + pinf), -exponent) +
           alpha_hat_j;
 
       const Number p_1_tilde =
-          (p_j + pinf) *
-              ryujin::pow(numerator / denominator, exponent_inverse) -
+          (p_j + pinf) * ryujin::pow(safe_division(numerator, denominator),
+                                     exponent_inverse) -
           pinf;
 
 #ifdef DEBUG_RIEMANN_SOLVER
@@ -271,17 +276,17 @@ namespace ryujin
 
       const Number p_max = std::max(p_i, p_j) + pinf;
 
-      Number radicand_i =
-          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_i) * p_max;
-      radicand_i /= rho_i * ((gamma_i + Number(1.)) * p_max +
-                             (gamma_i - Number(1.)) * (p_i + pinf));
+      const Number radicand_i = safe_division(
+          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_i) * p_max,
+          rho_i * ((gamma_i + Number(1.)) * p_max +
+                   (gamma_i - Number(1.)) * (p_i + pinf)));
 
       const Number x_i = std::sqrt(radicand_i);
 
-      Number radicand_j =
-          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_j) * p_max;
-      radicand_j /= rho_j * ((gamma_j + Number(1.)) * p_max +
-                             (gamma_j - Number(1.)) * (p_j + pinf));
+      const Number radicand_j = safe_division(
+          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_j) * p_max,
+          rho_j * ((gamma_j + Number(1.)) * p_max +
+                   (gamma_j - Number(1.)) * (p_j + pinf)));
 
       const Number x_j = std::sqrt(radicand_j);
 
@@ -289,8 +294,11 @@ namespace ryujin
       const Number b = u_j - u_i;
       const Number c = -(p_i + pinf) * x_i - (p_j + pinf) * x_j;
 
-      const Number base = (-b + std::sqrt(b * b - ScalarNumber(4.) * a * c)) /
-                          (ScalarNumber(2.) * a);
+      const Number base = safe_division(
+          std::abs(-b +
+                   std::sqrt(positive_part(b * b - ScalarNumber(4.) * a * c))),
+          std::abs(ScalarNumber(2.) * a));
+
       const Number p_2_tilde = base * base - pinf;
 
 #ifdef DEBUG_RIEMANN_SOLVER
@@ -348,7 +356,7 @@ namespace ryujin
       const Number gamma_m = std::min(gamma_i, gamma_j);
       const Number gamma_M = std::max(gamma_i, gamma_j);
 
-      const Number p_ratio = p_min / p_max;
+      const Number p_ratio = safe_division(p_min, p_max);
 
       /*
        * Here, we use a trick: The r-factor only shows up in the formula
@@ -376,8 +384,9 @@ namespace ryujin
       Number denominator = alpha_hat_min * ryujin::pow(p_ratio, -exponent) +
                            alpha_hat_max * ryujin::pow(p_ratio, r_exponent);
 
-      const Number p_tilde =
-          p_max * ryujin::pow(numerator / denominator, exponent_inverse) - pinf;
+      const auto temp = safe_division(numerator, denominator);
+
+      const Number p_tilde = p_max * ryujin::pow(temp, exponent_inverse) - pinf;
 
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "IN p_*_tilde  = " << p_tilde << "\n";
@@ -392,6 +401,8 @@ namespace ryujin
     RiemannSolver<dim, Number>::f(const primitive_type &riemann_data,
                                   const Number p_star) const
     {
+      constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
+
       const auto view = hyperbolic_system.view<dim, Number>();
       const auto interpolation_b = view.eos_interpolation_b();
       const auto pinf = view.eos_interpolation_pinfty();
@@ -406,19 +417,19 @@ namespace ryujin
 
       const Number Bz = gamma_minus_one / (gamma + Number(1.)) * (p + pinf);
 
-      const Number radicand = Az / (p_star + pinf + Bz);
+      const Number radicand = safe_division(Az, p_star + pinf + Bz);
 
       /* true_value is shock case */
       const Number true_value = (p_star - p) * std::sqrt(radicand);
 
       const auto exponent = ScalarNumber(0.5) * gamma_minus_one / gamma;
 
-      const Number ratio = (p_star + pinf) / (p + pinf);
+      const Number ratio = safe_division(p_star + pinf, p + pinf);
       const Number factor = ryujin::pow(ratio, exponent) - Number(1.);
 
-      /* true_value is rarefaction case */
-      const auto false_value =
-          ScalarNumber(2.) * a * one_minus_b_rho * factor / gamma_minus_one;
+      /* false_value is rarefaction case */
+      const auto false_value = ScalarNumber(2.) * a * one_minus_b_rho * factor /
+                               std::max(gamma_minus_one, Number(min));
 
       return dealii::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
@@ -454,19 +465,23 @@ namespace ryujin
 
       const Number p_max = std::max(p_i, p_j) + pinf;
 
-      const Number radicand_inverse_i = ScalarNumber(0.5) * rho_i /
-                                        (Number(1.) - interpolation_b * rho_i) *
-                                        ((gamma_i + Number(1.)) * p_max +
-                                         (gamma_i - Number(1.)) * (p_i + pinf));
+      const Number radicand_inverse_i =
+          safe_division(ScalarNumber(0.5) * rho_i,
+                        Number(1.) - interpolation_b * rho_i) *
+          ((gamma_i + Number(1.)) * p_max +
+           (gamma_i - Number(1.)) * (p_i + pinf));
 
-      const Number value_i = (p_max - p_i) / std::sqrt(radicand_inverse_i);
+      const Number value_i =
+          safe_division(p_max - p_i, std::sqrt(radicand_inverse_i));
 
-      const Number radicand_jnverse_j = ScalarNumber(0.5) * rho_j /
-                                        (Number(1.) - interpolation_b * rho_j) *
-                                        ((gamma_j + Number(1.)) * p_max +
-                                         (gamma_j - Number(1.)) * (p_j + pinf));
+      const Number radicand_inverse_j =
+          safe_division(ScalarNumber(0.5) * rho_j,
+                        Number(1.) - interpolation_b * rho_j) *
+          ((gamma_j + Number(1.)) * p_max +
+           (gamma_j - Number(1.)) * (p_j + pinf));
 
-      const Number value_j = (p_max - p_j) / std::sqrt(radicand_jnverse_j);
+      const Number value_j =
+          safe_division(p_max - p_j, std::sqrt(radicand_inverse_j));
 
       return value_i + value_j + u_j - u_i;
     }
@@ -485,7 +500,7 @@ namespace ryujin
       const auto factor =
           ScalarNumber(0.5) * (gamma + ScalarNumber(1.)) / gamma;
 
-      const Number tmp = positive_part((p_star - p) / (p + pinf));
+      const Number tmp = safe_division(positive_part(p_star - p), p + pinf);
 
       return u - a * std::sqrt(Number(1.) + factor * tmp);
     }
@@ -504,7 +519,7 @@ namespace ryujin
       const auto factor =
           ScalarNumber(0.5) * (gamma + ScalarNumber(1.)) / gamma;
 
-      const Number tmp = positive_part((p_star - p) / (p + pinf));
+      const Number tmp = safe_division(positive_part(p_star - p), p + pinf);
 
       return u + a * std::sqrt(Number(1.) + factor * tmp);
     }
