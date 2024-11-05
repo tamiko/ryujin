@@ -297,6 +297,9 @@ namespace ryujin
     print_info("entering main loop");
     computing_timer_["time loop"].start();
 
+    constexpr Number relax =
+        Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
+
     for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
@@ -313,7 +316,7 @@ namespace ryujin
 
       /* Perform various tasks whenever we reach a timer tick: */
 
-      if (t >= timer_cycle * timer_granularity_) {
+      if (t >= relax * timer_cycle * timer_granularity_) {
         output(state_vector, base_name_ + "-solution", t, timer_cycle);
 
         if (enable_compute_error_) {
@@ -345,15 +348,6 @@ namespace ryujin
 
       /* Break if we have reached the final time. */
 
-      /*
-       * Make sure that we do not loop forever due to roundoff errors when
-       * enforce_t_final_ is set to true.
-       */
-      const auto relax =
-          enforce_t_final_
-              ? Number(1. - 10. * std::numeric_limits<Number>::epsilon())
-              : Number(1.);
-
       if (t >= relax * t_final_)
         break;
 
@@ -382,13 +376,16 @@ namespace ryujin
       const auto tau = time_integrator_.step(
           state_vector,
           t,
-          enforce_t_final_ ? t_final_ : std::numeric_limits<Number>::max());
+          enforce_t_final_
+              ? std::min(t_final_, timer_cycle * timer_granularity_)
+              : std::numeric_limits<Number>::max());
 
       t += tau;
 
       /* Print and record cycle statistics: */
       if (terminal_update_interval_ != Number(0.)) {
-        const bool write_to_log_file = (t >= timer_cycle * timer_granularity_);
+        const bool write_to_log_file =
+            (t >= relax * timer_cycle * timer_granularity_);
 
         const auto wall_time = computing_timer_["time loop"].wall_time();
         int update_terminal =
