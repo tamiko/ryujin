@@ -25,6 +25,26 @@ namespace ryujin
 {
   namespace EulerAEOS
   {
+    /*
+     * For various divisions in the arbirtray equation of state module we
+     * have a mathematical guarantee that the numerator and denominator are
+     * nonnegative and the limit (of zero numerator and denominator) must
+     * converge to zero. The following function takes care of rounding
+     * issues when computing such quotients by (a) avoiding division by
+     * zero and (b) ensuring non-negativity of the result.
+     */
+    template <typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number safe_division(const Number &numerator,
+                                                      const Number &denominator)
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+      constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
+
+      return std::max(numerator, Number(0.)) /
+             std::max(denominator, Number(min));
+    }
+
+
     template <int dim, typename Number>
     class HyperbolicSystemView;
 
@@ -1172,7 +1192,7 @@ namespace ryujin
 
       const auto numerator = (p + pinf) * covolume;
       const auto denominator = rho_e - rho * q - covolume * pinf;
-      return Number(1.) + numerator / denominator;
+      return Number(1.) + safe_division(numerator, denominator);
     }
 
 
@@ -1190,7 +1210,8 @@ namespace ryujin
       const auto covolume = Number(1.) - b * rho;
 
 
-      return (gamma - Number(1.)) * (rho_e - rho * q) / covolume - gamma * pinf;
+      return positive_part(gamma - Number(1.)) *
+             safe_division(rho_e - rho * q, covolume - gamma * pinf);
     }
 
 
