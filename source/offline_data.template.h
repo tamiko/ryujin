@@ -1134,7 +1134,7 @@ namespace ryujin
       const auto partitioner = std::make_shared<Utilities::MPI::Partitioner>(
           dof_handler.locally_owned_mg_dofs(level),
           relevant_dofs,
-          lumped_mass_matrix_.get_mpi_communicator());
+          mpi_communicator_);
       level_lumped_mass_matrix_[level].reinit(partitioner);
       std::vector<types::global_dof_index> dof_indices(
           dof_handler.get_fe().dofs_per_cell);
