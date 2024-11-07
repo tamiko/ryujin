@@ -27,6 +27,7 @@ namespace ryujin
   TimeLoop<Description, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator_(mpi_comm)
+      , mpi_ensemble_(mpi_comm)
       , hyperbolic_system_("/B - Equation")
       , parabolic_system_("/B - Equation")
       , discretization_(mpi_communicator_, "/C - Discretization")
@@ -255,6 +256,11 @@ namespace ryujin
       quantities_.prepare(base_name_);
       print_mpi_partition(logfile_);
     };
+
+    {
+      print_info("setting up ensemble");
+      mpi_ensemble_.prepare();
+    }
 
     {
       Scope scope(computing_timer_, "(re)initialize data structures");

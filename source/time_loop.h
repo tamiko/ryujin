@@ -11,6 +11,7 @@
 #include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "mesh_adaptor.h"
+#include "mpi_ensemble.h"
 #include "offline_data.h"
 #include "parabolic_module.h"
 #include "postprocessor.h"
@@ -190,6 +191,7 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer_;
 
+    MPIEnsemble mpi_ensemble_;
     HyperbolicSystem hyperbolic_system_;
     ParabolicSystem parabolic_system_;
     Discretization<dim> discretization_;
