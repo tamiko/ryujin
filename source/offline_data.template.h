@@ -40,8 +40,8 @@ namespace ryujin
       const Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : ParameterAcceptor(subsection)
-      , discretization_(&discretization)
       , mpi_ensemble_(mpi_ensemble)
+      , discretization_(&discretization)
   {
     incidence_relaxation_even_ = 0.5;
     add_parameter("incidence matrix relaxation even degree",
