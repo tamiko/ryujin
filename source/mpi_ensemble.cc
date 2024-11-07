@@ -23,7 +23,6 @@ namespace ryujin
         dealii::Utilities::MPI::n_mpi_processes(world_communicator_);
 
     AssertThrow(n_ensembles > 0, dealii::ExcInternalError());
-    AssertThrow(global_tau_max, dealii::ExcNotImplemented());
     AssertThrow(n_world_ranks % n_ensembles == 0,
                 dealii::ExcMessage(
                     "The total number of (world) MPI ranks must be a multiple "
@@ -37,15 +36,19 @@ namespace ryujin
     const auto world_rank =
         dealii::Utilities::MPI::this_mpi_process(world_communicator_);
 
-    // FIXME: use a smarter binning strategy (or add a parameter).
+    // FIXME: we should use a smarter binning strategy...
     ensemble_ = world_rank % n_ensembles_;
 
     MPI_Comm_split(
         world_communicator_, ensemble_, world_rank, &subrange_communicator_);
 
+    const auto subrange_rank =
+        dealii::Utilities::MPI::this_mpi_process(subrange_communicator_);
+
+    MPI_Comm_split(
+        world_communicator_, subrange_rank, ensemble_, &peer_communicator_);
+
 #ifdef DEBUG_OUTPUT
-    const auto n_world_ranks =
-        dealii::Utilities::MPI::n_mpi_processes(world_communicator_);
     const auto subrange_rank =
         dealii::Utilities::MPI::this_mpi_process(subrange_communicator_);
     const auto n_subrange_ranks =

@@ -31,6 +31,9 @@ namespace ryujin
     /**
      * Prepare the MPI ensemble and split the gobal MPI communicator into
      * @p n_ensembles different subranges of comparable size.
+     *
+     * @pre The total number of mpi ranks must be an integer multiple of
+     * n_ensembles.
      */
     void prepare(const int n_ensembles = 1, const bool global_tau_max = true);
 
@@ -51,9 +54,16 @@ namespace ryujin
     ACCESSOR_READ_ONLY(ensemble);
 
     /**
-     * The corresponding subrange communicator for the ensemble.
+     * The corresponding subrange communicator of the ensemble.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(subrange_communicator);
+
+    /**
+     * A "peer communicator" that groups all kth ranks of each ensemble
+     * together. (Suppose the subrange_communicator() groups rows, then the
+     * peer_communicator() groups columns of the ensemble partition).
+     */
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(peer_communicator);
 
     /**
      * Return whether the ensemble has to be run with a global tau_max
@@ -70,6 +80,7 @@ namespace ryujin
     int ensemble_;
 
     MPI_Comm subrange_communicator_;
+    MPI_Comm peer_communicator_;
 
     bool global_tau_max_;
   };

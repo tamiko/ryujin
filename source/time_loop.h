@@ -153,6 +153,7 @@ namespace ryujin
     //@{
 
     std::string base_name_;
+    std::string base_name_ensemble_;
 
     std::string debug_filename_;
 
@@ -187,11 +188,10 @@ namespace ryujin
      */
     //@{
 
-    const MPI_Comm &mpi_communicator_;
+    MPIEnsemble mpi_ensemble_;
 
     std::map<std::string, dealii::Timer> computing_timer_;
 
-    MPIEnsemble mpi_ensemble_;
     HyperbolicSystem hyperbolic_system_;
     ParabolicSystem parabolic_system_;
     Discretization<dim> discretization_;
@@ -205,8 +205,9 @@ namespace ryujin
     VTUOutput<Description, dim, Number> vtu_output_;
     Quantities<Description, dim, Number> quantities_;
 
-    const unsigned int mpi_rank_;
-    const unsigned int n_mpi_processes_;
+    const unsigned int global_rank_;
+    const unsigned int n_global_ranks_;
+    dealii::types::global_dof_index n_global_dofs_;
 
     std::ofstream logfile_; /* log file */
 
