@@ -86,7 +86,7 @@ namespace ryujin
               initial_precomputed_type final
       {
         /* Compute bathymetry: */
-        return {geotiff_reader_.compute_height(point)};
+        return {static_cast<Number>(geotiff_reader_.compute_height(point))};
       }
 
     private:
