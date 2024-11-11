@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "mpi_ensemble.h"
 #include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -114,7 +115,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    MeshAdaptor(const MPI_Comm &mpi_communicator,
+    MeshAdaptor(const MPIEnsemble &mpi_ensemble,
                 const OfflineData<dim, Number> &offline_data,
                 const HyperbolicSystem &hyperbolic_system,
                 const ParabolicSystem &parabolic_system,
@@ -171,7 +172,7 @@ namespace ryujin
      */
     //@{
 
-    const MPI_Comm &mpi_communicator_;
+    const MPIEnsemble &mpi_ensemble_;
 
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
