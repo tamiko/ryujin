@@ -70,6 +70,14 @@ namespace ryujin
           "into the bottom left corner with index i to the right and index j "
           "up)");
 
+      transformation_allow_out_of_bounds_queries_ = false;
+      this->add_parameter(
+          "transformation allow out of bounds queries",
+          transformation_allow_out_of_bounds_queries_,
+          "GeoTIFF: allow out-of-bounds queries. When set to true, the reader "
+          "returns constant extended values for coordinates that are outside "
+          "of the image range.");
+
       transformation_use_geotiff_ = true;
       this->add_parameter("transformation use geotiff",
                           transformation_use_geotiff_,
@@ -132,35 +140,47 @@ namespace ryujin
         y = point[1];
       const auto &[di, dj] = apply_inverse_transformation(x, y);
 
-      /*
-       * Use a simple bilinear interpolation:
-       */
-
-      const auto i_left = static_cast<unsigned int>(std::floor(di));
-      const auto i_right = static_cast<unsigned int>(std::ceil(di));
-      const auto j_left = static_cast<unsigned int>(std::floor(dj));
-      const auto j_right = static_cast<unsigned int>(std::ceil(dj));
+      /* Check that we are in bounds: */
 
       const bool in_bounds =
-          i_left <= i_right &&
-          i_right < static_cast<unsigned int>(raster_size_[0]) &&
-          j_left <= j_right &&
-          j_right < static_cast<unsigned int>(raster_size_[1]);
+          di > -1.0 && di < static_cast<double>(raster_size_[0]) + 1.0 &&
+          dj > -1.0 && dj < static_cast<double>(raster_size_[1]) + 1.0;
 
 #ifdef DEBUG_OUTPUT
       if (!in_bounds) {
         std::cout << std::setprecision(16);
         std::cout << "Queried point out of bounds." << std::endl;
         std::cout << "Point: " << point << std::endl;
-        std::cout << "Transformed indices: (" << i_left << "," << j_left
-                  << ") and (" << i_right << "," << j_right << ")" << std::endl;
+        std::cout << "Transformed coordinates: (" << di << "," << dj << ")"
+                  << std::endl;
       }
 #endif
 
       AssertThrow(
-          in_bounds,
+          transformation_allow_out_of_bounds_queries_ || in_bounds,
           dealii::ExcMessage("Raster error: The requested point is outside "
                              "the image boundary of the geotiff file"));
+
+      /*
+       * Use a simple bilinear interpolation and ensure we never go below
+       * the minimum or above the maximum index.
+       */
+
+      const auto i_left = std::min(
+          std::max(static_cast<int>(std::floor(di)), 0), raster_size_[0]);
+      const auto i_right = std::min(
+          std::max(static_cast<int>(std::ceil(di)), 0), raster_size_[0]);
+      const auto j_left = std::min(
+          std::max(static_cast<int>(std::floor(dj)), 0), raster_size_[1]);
+      const auto j_right = std::min(
+          std::max(static_cast<int>(std::ceil(dj)), 0), raster_size_[1]);
+
+#ifdef DEBUG_OUTPUT
+      if (!in_bounds) {
+        std::cout << "index bounding box: (" << i_left << "," << j_left
+                  << ") and (" << i_right << "," << j_right << ")" << std::endl;
+      }
+#endif
 
       const double i_ratio = std::fmod(di, 1.);
       const double j_ratio = std::fmod(dj, 1.);
@@ -381,6 +401,7 @@ namespace ryujin
     std::string filename_;
 
     std::array<double, 6> transformation_;
+    bool transformation_allow_out_of_bounds_queries_;
     bool transformation_use_geotiff_;
     bool transformation_use_geotiff_origin_;
     HeightNormalization height_normalization_;
