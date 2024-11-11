@@ -28,8 +28,10 @@ namespace ryujin
   public:
     MPIEnsemble(const MPI_Comm &mpi_communicator)
         : world_communicator_(mpi_communicator)
+        , n_ensembles_(1)
         , ensemble_(0)
         , subrange_communicator_(mpi_communicator)
+        , global_tau_max_(true)
     {
     }
 
@@ -37,10 +39,11 @@ namespace ryujin
      * Prepare the MPI ensemble and split the gobal MPI communicator into
      * @p n_ensembles different subranges of comparable size.
      */
-    void prepare(const int n_ensembles = 1)
+    void prepare(const int n_ensembles = 1, const bool global_tau_max = true)
     {
       Assert(n_ensembles > 0, dealii::ExcInternalError());
       n_ensembles_ = n_ensembles;
+      global_tau_max_ = global_tau_max;
 
       const auto world_rank =
           dealii::Utilities::MPI::this_mpi_process(world_communicator_);
@@ -81,11 +84,22 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(subrange_communicator);
 
+    /**
+     * Return whether the ensemble has to be run with a global tau_max
+     * constraint in which every ensemble member performs an update with
+     * the same time step, or whether synchronization is only performed
+     * over the ensemble.
+     */
+    ACCESSOR_READ_ONLY(global_tau_max);
+
   private:
     const MPI_Comm &world_communicator_;
 
     int n_ensembles_;
     int ensemble_;
+
     MPI_Comm subrange_communicator_;
+
+    bool global_tau_max_;
   };
 } /* namespace ryujin */
