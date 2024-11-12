@@ -26,42 +26,13 @@ namespace ryujin
   class MPIEnsemble final
   {
   public:
-    MPIEnsemble(const MPI_Comm &mpi_communicator)
-        : world_communicator_(mpi_communicator)
-        , n_ensembles_(1)
-        , ensemble_(0)
-        , subrange_communicator_(mpi_communicator)
-        , global_tau_max_(true)
-    {
-    }
+    MPIEnsemble(const MPI_Comm &mpi_communicator);
 
     /**
      * Prepare the MPI ensemble and split the gobal MPI communicator into
      * @p n_ensembles different subranges of comparable size.
      */
-    void prepare(const int n_ensembles = 1, const bool global_tau_max = true)
-    {
-      Assert(n_ensembles > 0, dealii::ExcInternalError());
-      n_ensembles_ = n_ensembles;
-      global_tau_max_ = global_tau_max;
-
-      const auto world_rank =
-          dealii::Utilities::MPI::this_mpi_process(world_communicator_);
-
-      // FIXME: use a smarter binning strategy (or add a parameter).
-      ensemble_ = world_rank % n_ensembles_;
-
-      MPI_Comm_split(
-          world_communicator_, ensemble_, world_rank, &subrange_communicator_);
-
-#ifdef DEBUG_OUTPUT
-      const auto subrange_rank =
-          dealii::Utilities::MPI::this_mpi_process(subrange_communicator_);
-
-      std::cout << "RANK: (" << world_rank << "," << subrange_rank
-                << ") -> COLOR: " << ensemble_ << std::endl;
-#endif
-    }
+    void prepare(const int n_ensembles = 1, const bool global_tau_max = true);
 
     /**
      * Return the world communicator.

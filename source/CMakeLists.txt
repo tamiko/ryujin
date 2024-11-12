@@ -15,6 +15,7 @@ configure_file(
 set(COMMON_SOURCE_FILES
   discretization.cc
   equation_dispatch.cc
+  mpi_ensemble.cc
   multicomponent_vector.cc
   offline_data.cc
   simd.cc
