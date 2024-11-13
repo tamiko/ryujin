@@ -404,9 +404,12 @@ namespace ryujin
 
       /* Print and record cycle statistics: */
       if (terminal_update_interval_ != Number(0.)) {
+
+        /* Do we need to update the log file? */
         const bool write_to_log_file =
             (t >= relax * timer_cycle * timer_granularity_);
 
+        /* Do we need to update the terminal? */
         const auto wall_time = computing_timer_["time loop"].wall_time();
         int update_terminal =
             (wall_time >= last_terminal_output + terminal_update_interval_);
@@ -952,7 +955,7 @@ namespace ryujin
 
     /* Also print out parameters to a prm file: */
 
-    std::ofstream output(base_name_ensemble_ + "-parameters.prm");
+    std::ofstream output(base_name_ + "-parameters.prm");
     ParameterAcceptor::prm.print_parameters(output, ParameterHandler::ShortPRM);
   }
 
