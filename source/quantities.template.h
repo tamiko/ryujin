@@ -268,10 +268,10 @@ namespace ryujin
        */
 
       const auto received = Utilities::MPI::gather(
-          mpi_ensemble_.subrange_communicator(), interior_map);
+          mpi_ensemble_.ensemble_communicator(), interior_map);
 
       if (Utilities::MPI::this_mpi_process(
-              mpi_ensemble_.subrange_communicator()) == 0) {
+              mpi_ensemble_.ensemble_communicator()) == 0) {
 
         std::ofstream output(base_name_ + "-" + name + "-R" +
                              Utilities::to_string(cycle, 4) + "-points.dat");
@@ -311,10 +311,10 @@ namespace ryujin
        */
 
       const auto received = Utilities::MPI::gather(
-          mpi_ensemble_.subrange_communicator(), boundary_map);
+          mpi_ensemble_.ensemble_communicator(), boundary_map);
 
       if (Utilities::MPI::this_mpi_process(
-              mpi_ensemble_.subrange_communicator()) == 0) {
+              mpi_ensemble_.ensemble_communicator()) == 0) {
 
         std::ofstream output(base_name_ + "-" + name + "-R" +
                              Utilities::to_string(cycle, 4) + "-points.dat");
@@ -411,12 +411,12 @@ namespace ryujin
     /* synchronize MPI ranks (MPI Barrier): */
 
     mass_sum =
-        Utilities::MPI::sum(mass_sum, mpi_ensemble_.subrange_communicator());
+        Utilities::MPI::sum(mass_sum, mpi_ensemble_.ensemble_communicator());
 
     std::get<0>(spatial_average) = Utilities::MPI::sum(
-        std::get<0>(spatial_average), mpi_ensemble_.subrange_communicator());
+        std::get<0>(spatial_average), mpi_ensemble_.ensemble_communicator());
     std::get<1>(spatial_average) = Utilities::MPI::sum(
-        std::get<1>(spatial_average), mpi_ensemble_.subrange_communicator());
+        std::get<1>(spatial_average), mpi_ensemble_.ensemble_communicator());
 
     /* take average: */
 
@@ -442,10 +442,10 @@ namespace ryujin
      */
 
     const auto received =
-        Utilities::MPI::gather(mpi_ensemble_.subrange_communicator(), values);
+        Utilities::MPI::gather(mpi_ensemble_.ensemble_communicator(), values);
 
     if (Utilities::MPI::this_mpi_process(
-            mpi_ensemble_.subrange_communicator()) == 0) {
+            mpi_ensemble_.ensemble_communicator()) == 0) {
 
       std::ofstream output(file_name);
       output << std::scientific << std::setprecision(14);
@@ -473,7 +473,7 @@ namespace ryujin
       bool append)
   {
     if (Utilities::MPI::this_mpi_process(
-            mpi_ensemble_.subrange_communicator()) == 0) {
+            mpi_ensemble_.ensemble_communicator()) == 0) {
       std::ofstream output;
       output << std::scientific << std::setprecision(14);
 

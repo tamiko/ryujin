@@ -146,10 +146,10 @@ namespace ryujin
         /* MPI-based synchronous IO */
         data_out->write_vtu_in_parallel(
             name + "_" + Utilities::to_string(cycle, 6) + ".vtu",
-            mpi_ensemble_.subrange_communicator());
+            mpi_ensemble_.ensemble_communicator());
       } else {
         data_out->write_vtu_with_pvtu_record(
-            "", name, cycle, mpi_ensemble_.subrange_communicator(), 6);
+            "", name, cycle, mpi_ensemble_.ensemble_communicator(), 6);
       }
     }
 
@@ -193,13 +193,13 @@ namespace ryujin
         /* MPI-based synchronous IO */
         data_out->write_vtu_in_parallel(
             name + "-levelsets_" + Utilities::to_string(cycle, 6) + ".vtu",
-            mpi_ensemble_.subrange_communicator());
+            mpi_ensemble_.ensemble_communicator());
       } else {
         data_out->write_vtu_with_pvtu_record(
             "",
             name + "-levelsets",
             cycle,
-            mpi_ensemble_.subrange_communicator(),
+            mpi_ensemble_.ensemble_communicator(),
             6);
       }
     }

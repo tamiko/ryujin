@@ -431,7 +431,7 @@ namespace ryujin
             *std::min_element(internal_energy_.begin(), internal_energy_.end());
 
         e_min_old = Utilities::MPI::min(e_min_old,
-                                        mpi_ensemble_.subrange_communicator());
+                                        mpi_ensemble_.ensemble_communicator());
 
         // FIXME: create a meaningful relaxation based on global mesh size min.
         constexpr Number eps = std::numeric_limits<Number>::epsilon();
@@ -767,7 +767,7 @@ namespace ryujin
           auto e_min_new = *std::min_element(internal_energy_.begin(),
                                              internal_energy_.end());
           e_min_new = Utilities::MPI::min(
-              e_min_new, mpi_ensemble_.subrange_communicator());
+              e_min_new, mpi_ensemble_.ensemble_communicator());
 
           if (e_min_new < e_min_old) {
 #ifdef DEBUG_OUTPUT
@@ -849,9 +849,9 @@ namespace ryujin
          * synchronized global time steps. (Otherwise different ensembles
          * might end up with a different time step.)
          */
-        if (mpi_ensemble_.global_tau_max())
-          restart_needed.store(Utilities::MPI::logical_or(
-              restart_needed.load(), mpi_ensemble_.world_communicator()));
+        restart_needed.store(Utilities::MPI::logical_or(
+            restart_needed.load(),
+            mpi_ensemble_.synchronization_communicator()));
       }
 
       if (restart_needed) {

@@ -73,8 +73,6 @@ namespace ryujin
                     hyperbolic_system_,
                     parabolic_system_,
                     "/K - Quantities")
-      , global_rank_(dealii::Utilities::MPI::this_mpi_process(mpi_comm))
-      , n_global_ranks_(dealii::Utilities::MPI::n_mpi_processes(mpi_comm))
   {
     base_name_ = "test";
     add_parameter("basename", base_name_, "Base name for all output files");
@@ -221,11 +219,21 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
-    /*
-     * Attach log file and record runtime parameters:
-     */
+    {
+      mpi_ensemble_.prepare();
 
-    if (global_rank_ == 0)
+      base_name_ensemble_ = base_name_;
+      if (mpi_ensemble_.n_ensembles() > 1) {
+        print_info("setting up MPI ensemble");
+        base_name_ensemble_ += "-ensemble_" + dealii::Utilities::int_to_string(
+                                                  mpi_ensemble_.ensemble(),
+                                                  mpi_ensemble_.n_ensembles());
+      }
+    }
+
+    /* Attach log file and record runtime parameters: */
+
+    if (mpi_ensemble_.world_rank() == 0)
       logfile_.open(base_name_ + ".log");
 
     print_parameters(logfile_);
@@ -234,24 +242,11 @@ namespace ryujin
      * Prepare data structures:
      */
 
-    {
-      print_info("setting up ensemble");
-      mpi_ensemble_.prepare(2);
-
-      base_name_ensemble_ = base_name_;
-      if (mpi_ensemble_.n_ensembles() > 1)
-        base_name_ensemble_ += "-ensemble_" + dealii::Utilities::int_to_string(
-                                                  mpi_ensemble_.ensemble(),
-                                                  mpi_ensemble_.n_ensembles());
-    }
-
     Number t = 0.;
     unsigned int timer_cycle = 0;
     StateVector state_vector;
 
-    /*
-     * Create a small lambda for preparing compute kernels:
-     */
+    /* Create a small lambda for preparing compute kernels: */
     const auto prepare_compute_kernels = [&]() {
       print_info("preparing compute kernels");
 
@@ -265,9 +260,10 @@ namespace ryujin
       quantities_.prepare(base_name_ensemble_);
       print_mpi_partition(logfile_);
 
-      n_global_dofs_ =
-          dealii::Utilities::MPI::sum(offline_data_.dof_handler().n_dofs(),
-                                      mpi_ensemble_.peer_communicator());
+      if (mpi_ensemble_.ensemble_rank() == 0)
+        n_global_dofs_ = dealii::Utilities::MPI::sum(
+            offline_data_.dof_handler().n_dofs(),
+            mpi_ensemble_.ensemble_leader_communicator());
     };
 
     {
@@ -446,7 +442,7 @@ namespace ryujin
       compute_error(state_vector, t);
     }
 
-    if (global_rank_ == 0 && debug_filename_ != "") {
+    if (mpi_ensemble_.world_rank() == 0 && debug_filename_ != "") {
       std::ifstream f(debug_filename_);
       if (f.is_open())
         std::cout << f.rdbuf();
@@ -498,7 +494,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if (global_rank_ == 0) {
+    if (mpi_ensemble_.ensemble_rank() == 0) {
       std::string meta = name + ".metadata";
 
       std::ifstream file(meta, std::ios::binary);
@@ -509,17 +505,17 @@ namespace ryujin
     int ierr;
     if constexpr (std::is_same_v<Number, double>)
       ierr = MPI_Bcast(
-          &t, 1, MPI_DOUBLE, 0, mpi_ensemble_.subrange_communicator());
+          &t, 1, MPI_DOUBLE, 0, mpi_ensemble_.ensemble_communicator());
     else
       ierr =
-          MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_ensemble_.subrange_communicator());
+          MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
 
     ierr = MPI_Bcast(&output_cycle,
                      1,
                      MPI_UNSIGNED,
                      0,
-                     mpi_ensemble_.subrange_communicator());
+                     mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
 
     /*
@@ -609,7 +605,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if (global_rank_ == 0) {
+    if (mpi_ensemble_.ensemble_rank() == 0) {
       for (const std::string suffix :
            {".mesh", ".mesh_fixed.data", ".mesh.info", ".metadata"})
         if (std::filesystem::exists(name + suffix))
@@ -628,14 +624,14 @@ namespace ryujin
      * Now, write out metadata on rank 0:
      */
 
-    if (global_rank_ == 0) {
+    if (mpi_ensemble_.ensemble_rank() == 0) {
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);
       oa << t << output_cycle;
     }
 
-    const int ierr = MPI_Barrier(mpi_ensemble_.subrange_communicator());
+    const int ierr = MPI_Barrier(mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
   }
 
@@ -770,7 +766,7 @@ namespace ryujin
       if (error_normalize_) {
         linf_norm_analytic =
             Utilities::MPI::max(analytic_component.linfty_norm(),
-                                mpi_ensemble_.subrange_communicator());
+                                mpi_ensemble_.ensemble_communicator());
 
         VectorTools::integrate_difference(
             offline_data_.dof_handler(),
@@ -782,7 +778,7 @@ namespace ryujin
 
         l1_norm_analytic =
             Utilities::MPI::sum(difference_per_cell.l1_norm(),
-                                mpi_ensemble_.subrange_communicator());
+                                mpi_ensemble_.ensemble_communicator());
 
         VectorTools::integrate_difference(
             offline_data_.dof_handler(),
@@ -794,7 +790,7 @@ namespace ryujin
 
         l2_norm_analytic = Number(std::sqrt(
             Utilities::MPI::sum(std::pow(difference_per_cell.l2_norm(), 2),
-                                mpi_ensemble_.subrange_communicator())));
+                                mpi_ensemble_.ensemble_communicator())));
       }
 
       /* Compute norms of error: */
@@ -806,7 +802,7 @@ namespace ryujin
       error_component -= analytic_component;
 
       const Number linf_norm_error = Utilities::MPI::max(
-          error_component.linfty_norm(), mpi_ensemble_.subrange_communicator());
+          error_component.linfty_norm(), mpi_ensemble_.ensemble_communicator());
 
       VectorTools::integrate_difference(offline_data_.dof_handler(),
                                         error_component,
@@ -816,7 +812,7 @@ namespace ryujin
                                         VectorTools::L1_norm);
 
       const Number l1_norm_error = Utilities::MPI::sum(
-          difference_per_cell.l1_norm(), mpi_ensemble_.subrange_communicator());
+          difference_per_cell.l1_norm(), mpi_ensemble_.ensemble_communicator());
 
       VectorTools::integrate_difference(offline_data_.dof_handler(),
                                         error_component,
@@ -827,7 +823,7 @@ namespace ryujin
 
       const Number l2_norm_error = Number(std::sqrt(
           Utilities::MPI::sum(std::pow(difference_per_cell.l2_norm(), 2),
-                              mpi_ensemble_.subrange_communicator())));
+                              mpi_ensemble_.ensemble_communicator())));
 
       if (error_normalize_) {
         linf_norm += linf_norm_error / linf_norm_analytic;
@@ -840,19 +836,24 @@ namespace ryujin
       }
     }
 
+    if (mpi_ensemble_.ensemble_rank() != 0)
+      return;
+
     /*
      * Sum up over all participating MPI ranks. Note: we only perform this
      * operation on "peer" ranks zero:
      */
 
     if (mpi_ensemble_.n_ensembles() > 1) {
-      linf_norm =
-          Utilities::MPI::sum(linf_norm, mpi_ensemble_.peer_communicator());
-      l1_norm = Utilities::MPI::sum(l1_norm, mpi_ensemble_.peer_communicator());
-      l2_norm = Utilities::MPI::sum(l2_norm, mpi_ensemble_.peer_communicator());
+      linf_norm = Utilities::MPI::sum(
+          linf_norm, mpi_ensemble_.ensemble_leader_communicator());
+      l1_norm = Utilities::MPI::sum(
+          l1_norm, mpi_ensemble_.ensemble_leader_communicator());
+      l2_norm = Utilities::MPI::sum(
+          l2_norm, mpi_ensemble_.ensemble_leader_communicator());
     }
 
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     logfile_ << std::endl << "Computed errors:" << std::endl << std::endl;
@@ -939,7 +940,7 @@ namespace ryujin
   void
   TimeLoop<Description, dim, Number>::print_parameters(std::ostream &stream)
   {
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     /* Output commit and library information: */
@@ -987,12 +988,13 @@ namespace ryujin
     const auto data =
         Utilities::MPI::min_max_avg(values, mpi_ensemble_.world_communicator());
 
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     std::ostringstream output;
 
-    unsigned int n = dealii::Utilities::needed_digits(n_global_ranks_);
+    unsigned int n =
+        dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
 
     const auto print_snippet = [&output, n](const std::string &name,
                                             const auto &values) {
@@ -1048,12 +1050,13 @@ namespace ryujin
     Utilities::MPI::MinMaxAvg data = Utilities::MPI::min_max_avg(
         stats.VmRSS / 1024., mpi_ensemble_.world_communicator());
 
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     std::ostringstream output;
 
-    unsigned int n = dealii::Utilities::needed_digits(n_global_ranks_);
+    unsigned int n =
+        dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
 
     output << "\nMemory:      [MiB]"                          //
            << std::setw(8) << data.min                        //
@@ -1101,7 +1104,8 @@ namespace ryujin
              << wall_time.avg << "s [sk: " << std::setprecision(1)
              << std::setw(5) << std::fixed << skew_negative << "%/"
              << std::setw(4) << std::fixed << skew_positive << "%]";
-      unsigned int n = dealii::Utilities::needed_digits(n_global_ranks_);
+      unsigned int n =
+          dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
       stream << " [p" << std::setw(n) << wall_time.min_index << "/"
              << wall_time.max_index << "]";
     };
@@ -1138,12 +1142,12 @@ namespace ryujin
     bool compute_percentages = false;
     for (auto &it : computing_timer_) {
       print_cpu_time(it.second, *jt++, compute_percentages);
-      if (it.first.find("time loop") == 0)
+      if (it.first.starts_with("time loop"))
         compute_percentages = true;
     }
     equalize();
 
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     stream << std::endl << "Timer statistics:\n";
@@ -1309,7 +1313,7 @@ namespace ryujin
     const unsigned int minutes = eta / 60;
     output << minutes << " min";
 
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     stream << output.str() << std::endl;
@@ -1319,7 +1323,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
   {
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     std::cout << "[INFO] " << header << std::endl;
@@ -1332,7 +1336,7 @@ namespace ryujin
                                                  const std::string &secondary,
                                                  std::ostream &stream)
   {
-    if (global_rank_ != 0)
+    if (mpi_ensemble_.world_rank() != 0)
       return;
 
     const int header_size = header.size();
@@ -1405,9 +1409,9 @@ namespace ryujin
     if (mpi_ensemble_.n_ensembles() > 1) {
       output << mpi_ensemble_.n_ensembles() << " ensembles ";
     }
-    output << "with "                        //
-           << n_global_dofs_ << " Qdofs on " //
-           << n_global_ranks_ << " ranks / " //
+    output << "with "                                      //
+           << n_global_dofs_ << " Qdofs on "               //
+           << mpi_ensemble_.n_world_ranks() << " ranks / " //
 #ifdef WITH_OPENMP
            << MultithreadInfo::n_threads() << " threads <" //
 #else
@@ -1424,7 +1428,7 @@ namespace ryujin
     print_timers(output);
     print_throughput(cycle, t, output, final_time);
 
-    if (global_rank_ == 0) {
+    if (mpi_ensemble_.world_rank() == 0) {
 #ifndef DEBUG_OUTPUT
       std::cout << "\033[2J\033[H";
 #endif

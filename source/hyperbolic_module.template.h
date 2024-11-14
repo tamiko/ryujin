@@ -572,11 +572,8 @@ namespace ryujin
        * MPI Barrier: Synchronize the maximal time-step size. This has to
        * happen either over the global, or the local subrange communicator:
        */
-      tau_max.store(
-          Utilities::MPI::min(tau_max.load(),
-                              mpi_ensemble_.global_tau_max()
-                                  ? mpi_ensemble_.world_communicator()
-                                  : mpi_ensemble_.subrange_communicator()));
+      tau_max.store(Utilities::MPI::min(
+          tau_max.load(), mpi_ensemble_.synchronization_communicator()));
 
       AssertThrow(
           !std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
@@ -1207,10 +1204,7 @@ namespace ryujin
        * might end up with a different time step.)
        */
       restart_needed.store(Utilities::MPI::logical_or(
-          restart_needed.load(),
-          mpi_ensemble_.global_tau_max()
-              ? mpi_ensemble_.world_communicator()
-              : mpi_ensemble_.subrange_communicator()));
+          restart_needed.load(), mpi_ensemble_.synchronization_communicator()));
     }
 
     if (restart_needed) {

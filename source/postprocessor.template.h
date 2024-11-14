@@ -241,9 +241,9 @@ namespace ryujin
           q_min = std::min(q_min, std::abs(q));
         }
         q_max = dealii::Utilities::MPI::max(
-            q_max, mpi_ensemble_.subrange_communicator());
+            q_max, mpi_ensemble_.ensemble_communicator());
         q_min = dealii::Utilities::MPI::min(
-            q_min, mpi_ensemble_.subrange_communicator());
+            q_min, mpi_ensemble_.ensemble_communicator());
         Assert(q_max >= q_min, dealii::ExcInternalError());
       }
     }

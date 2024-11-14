@@ -16,7 +16,7 @@ namespace ryujin
 {
   /**
    * A class responsible for subdividing a given global MPI communicator
-   * into a set of "ensembles" with a coresponding subrange communicator.
+   * into a set of "ensembles" with a coresponding ensemble communicator.
    *
    * After @p prepare() is called, all getter functions return valid
    * references.
@@ -38,13 +38,18 @@ namespace ryujin
      * n_ensembles.
      */
     void prepare(const int n_ensembles = 1,
-                 const bool global_tau_max = true,
-                 const bool require_uniform_ensemble_partition = true);
+                 const bool global_synchronization = true);
 
     /**
      * Return the world communicator.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(world_communicator);
+
+    /**
+     * If true, then ensembles run in lock step with a synchronized
+     * tau_max.
+     */
+    ACCESSOR_READ_ONLY(global_synchronization);
 
     /**
      * The (global) world rank of the current MPI process.
@@ -82,33 +87,41 @@ namespace ryujin
      * communicator is collective over all ranks participating in the
      * ensemble. I.e., it allows for ensemble-local communication.
      */
-    ACCESSOR_READ_ONLY_NO_DEREFERENCE(subrange_communicator);
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(ensemble_communicator);
+
+    /**
+     * Return a communicator for synchronization. The method either returns
+     * the (global) world communicator if global synchronization is
+     * enabled, or the (local) ensemble communicator.
+     */
+    DEAL_II_ALWAYS_INLINE inline const MPI_Comm &
+    synchronization_communicator() const
+    {
+      if (global_synchronization_)
+        return world_communicator_;
+      else
+        return ensemble_communicator_;
+    }
 
     /**
      * A communicator spanning over all ensemble leaders that have ensemble
      * rank 0. This communicator is collective over all ensemble leaders
      * and invalid for all other ranks.
      */
-    ACCESSOR_READ_ONLY_NO_DEREFERENCE(subrange_leader_communicator);
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(ensemble_leader_communicator);
 
     /**
      * A "peer communicator" that groups all kth ranks of each ensemble
-     * together. (Suppose the subrange_communicator() groups rows, then the
+     * together. (Suppose the ensemble_communicator() groups rows, then the
      * peer_communicator() groups columns of the ensemble partition). The
      * peer communicator is collective over all world ranks.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(peer_communicator);
 
-    /**
-     * Return whether the ensemble has to be run with a global tau_max
-     * constraint in which every ensemble member performs an update with
-     * the same time step, or whether synchronization is only performed
-     * over the ensemble.
-     */
-    ACCESSOR_READ_ONLY(global_tau_max);
-
   private:
     const MPI_Comm &world_communicator_;
+
+    bool global_synchronization_;
 
     int world_rank_;
     int n_world_ranks_;
@@ -118,13 +131,11 @@ namespace ryujin
     int n_ensemble_ranks_;
 
     MPI_Group world_group_;
-    std::vector<MPI_Group> subrange_groups_;
-    MPI_Group subrange_leader_group_;
+    std::vector<MPI_Group> ensemble_groups_;
+    MPI_Group ensemble_leader_group_;
 
-    MPI_Comm subrange_communicator_;
-    MPI_Comm subrange_leader_communicator_;
+    MPI_Comm ensemble_communicator_;
+    MPI_Comm ensemble_leader_communicator_;
     MPI_Comm peer_communicator_;
-
-    bool global_tau_max_;
   };
 } /* namespace ryujin */

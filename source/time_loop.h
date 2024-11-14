@@ -205,8 +205,6 @@ namespace ryujin
     VTUOutput<Description, dim, Number> vtu_output_;
     Quantities<Description, dim, Number> quantities_;
 
-    const unsigned int global_rank_;
-    const unsigned int n_global_ranks_;
     dealii::types::global_dof_index n_global_dofs_;
 
     std::ofstream logfile_; /* log file */

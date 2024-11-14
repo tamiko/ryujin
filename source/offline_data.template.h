@@ -131,14 +131,14 @@ namespace ryujin
     {
       /* Check that constraints are consistent in parallel: */
       const std::vector<IndexSet> &locally_owned_dofs =
-          Utilities::MPI::all_gather(mpi_ensemble_.subrange_communicator(),
+          Utilities::MPI::all_gather(mpi_ensemble_.ensemble_communicator(),
                                      dof_handler.locally_owned_dofs());
       const IndexSet locally_active =
           dealii::DoFTools::extract_locally_active_dofs(dof_handler);
       Assert(affine_constraints_.is_consistent_in_parallel(
                  locally_owned_dofs,
                  locally_active,
-                 mpi_ensemble_.subrange_communicator(),
+                 mpi_ensemble_.ensemble_communicator(),
                  /*verbose*/ true),
              ExcInternalError());
     }
@@ -181,7 +181,7 @@ namespace ryujin
     SparsityTools::distribute_sparsity_pattern(
         sparsity_pattern_,
         locally_owned,
-        mpi_ensemble_.subrange_communicator(),
+        mpi_ensemble_.ensemble_communicator(),
         locally_relevant);
   }
 
@@ -222,7 +222,7 @@ namespace ryujin
      * not know at this point because they depend on the renumbering...).
      */
     DoFRenumbering::export_indices_first(dof_handler,
-                                         mpi_ensemble_.subrange_communicator(),
+                                         mpi_ensemble_.ensemble_communicator(),
                                          n_locally_owned_,
                                          1);
 
@@ -250,7 +250,7 @@ namespace ryujin
      */
     n_export_indices_ = DoFRenumbering::export_indices_first(
         dof_handler,
-        mpi_ensemble_.subrange_communicator(),
+        mpi_ensemble_.ensemble_communicator(),
         n_locally_internal_,
         VectorizedArray<Number>::size());
 
@@ -286,7 +286,7 @@ namespace ryujin
         return left || right;
       };
       return Utilities::MPI::all_reduce(
-          local_value, mpi_ensemble_.subrange_communicator(), comparator);
+          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
     };
 
     /*
@@ -357,7 +357,7 @@ namespace ryujin
     n_locally_relevant_ = locally_relevant.n_elements();
 
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
-        locally_owned, locally_relevant, mpi_ensemble_.subrange_communicator());
+        locally_owned, locally_relevant, mpi_ensemble_.ensemble_communicator());
 
     hyperbolic_vector_partitioner_ = Vectors::create_vector_partitioner(
         scalar_partitioner_, problem_dimension);
@@ -453,7 +453,7 @@ namespace ryujin
     TrilinosWrappers::SparsityPattern trilinos_sparsity_pattern;
     trilinos_sparsity_pattern.reinit(locally_owned,
                                      sparsity_pattern_,
-                                     mpi_ensemble_.subrange_communicator());
+                                     mpi_ensemble_.ensemble_communicator());
 
     TrilinosWrappers::SparseMatrix mass_matrix_tmp;
     TrilinosWrappers::SparseMatrix mass_matrix_inverse_tmp;
@@ -766,7 +766,7 @@ namespace ryujin
     cij_matrix_.update_ghost_rows();
 
     measure_of_omega_ = Utilities::MPI::sum(
-        measure_of_omega_, mpi_ensemble_.subrange_communicator());
+        measure_of_omega_, mpi_ensemble_.ensemble_communicator());
 
     /*
      * Create lumped mass matrix:
@@ -1015,7 +1015,7 @@ namespace ryujin
     for (unsigned int i = 0; i < n_locally_owned_; ++i)
       total_mass += lumped_mass_matrix_.local_element(i);
     total_mass =
-        Utilities::MPI::sum(total_mass, mpi_ensemble_.subrange_communicator());
+        Utilities::MPI::sum(total_mass, mpi_ensemble_.ensemble_communicator());
 
     Assert(std::abs(measure_of_omega_ - total_mass) <
                1.e-12 * measure_of_omega_,
@@ -1142,7 +1142,7 @@ namespace ryujin
       const auto partitioner = std::make_shared<Utilities::MPI::Partitioner>(
           dof_handler.locally_owned_mg_dofs(level),
           relevant_dofs,
-          mpi_ensemble_.subrange_communicator());
+          mpi_ensemble_.ensemble_communicator());
       level_lumped_mass_matrix_[level].reinit(partitioner);
       std::vector<types::global_dof_index> dof_indices(
           dof_handler.get_fe().dofs_per_cell);

@@ -74,7 +74,7 @@ namespace ryujin
       const auto settings =
           Triangulation::Settings::construct_multigrid_hierarchy;
       triangulation_ = std::make_unique<Triangulation>(
-          mpi_ensemble_.subrange_communicator(), smoothing, settings);
+          mpi_ensemble_.ensemble_communicator(), smoothing, settings);
 
     } else {
       const auto settings = static_cast<typename Triangulation::Settings>(
@@ -82,7 +82,7 @@ namespace ryujin
           Triangulation::construct_multigrid_hierarchy);
       /* Beware of the boolean: */
       triangulation_ =
-          std::make_unique<Triangulation>(mpi_ensemble_.subrange_communicator(),
+          std::make_unique<Triangulation>(mpi_ensemble_.ensemble_communicator(),
                                           smoothing,
                                           /*artificial cells*/ true,
                                           settings);
@@ -106,7 +106,7 @@ namespace ryujin
     }
 
     if (mesh_writeout_ && dealii::Utilities::MPI::this_mpi_process(
-                              mpi_ensemble_.subrange_communicator()) == 0) {
+                              mpi_ensemble_.ensemble_communicator()) == 0) {
 #ifdef DEAL_II_GMSH_WITH_API
       GridOut grid_out;
       grid_out.write_msh(triangulation, base_name + "-coarse_grid.msh");
