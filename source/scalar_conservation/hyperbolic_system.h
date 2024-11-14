@@ -732,9 +732,6 @@ namespace ryujin
                                "for scalar conservation equations."));
         __builtin_trap();
 
-      } else if (id == Boundary::do_nothing) {
-        /* Do nothing */
-
       } else {
         AssertThrow(false, dealii::ExcNotImplemented());
       }

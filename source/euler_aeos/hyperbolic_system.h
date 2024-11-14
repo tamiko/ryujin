@@ -394,7 +394,7 @@ namespace ryujin
       static inline const auto precomputed_names =
           std::array<std::string, n_precomputed_values>{
               {"p",
-               "surrogate_gamma",
+               "surrogate_gamma_min",
                "surrogate_specific_entropy",
                "surrogate_harten_entropy"}};
 
@@ -1209,9 +1209,9 @@ namespace ryujin
       const auto rho_e = internal_energy(U);
       const auto covolume = Number(1.) - b * rho;
 
-
       return positive_part(gamma - Number(1.)) *
-             safe_division(rho_e - rho * q, covolume - gamma * pinf);
+                 safe_division(rho_e - rho * q, covolume) -
+             gamma * pinf;
     }
 
 
@@ -1389,9 +1389,6 @@ namespace ryujin
         }
         /* Supersonic outflow: do nothing, i.e., keep U as is */
 #endif
-
-      } else if (id == Boundary::do_nothing) {
-        /* Do nothing */
 
       } else {
         AssertThrow(false, dealii::ExcNotImplemented());
