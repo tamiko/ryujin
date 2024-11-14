@@ -1209,9 +1209,9 @@ namespace ryujin
       const auto rho_e = internal_energy(U);
       const auto covolume = Number(1.) - b * rho;
 
-
       return positive_part(gamma - Number(1.)) *
-             safe_division(rho_e - rho * q, covolume - gamma * pinf);
+                 safe_division(rho_e - rho * q, covolume) -
+             gamma * pinf;
     }
 
 
