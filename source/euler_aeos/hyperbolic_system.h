@@ -588,6 +588,17 @@ namespace ryujin
       Number surrogate_pressure(const state_type &U, const Number &gamma) const;
 
       /**
+       * For a given (2+dim dimensional) state vector <code>U</code> and
+       * gamma <code>gamma</code>, compute a surrogate speed of sound:
+       * \f{align}
+       *   c^2(\rho, e, \gamma) = \frac{\gamma (p + p_\infty)}{\rho X}
+       *       = \frac{\gamma (\gamma -1)[\rho (e - q) - p_\infty X]}{\rho X^2}
+       * \f}
+       */
+      Number surrogate_speed_of_sound(const state_type &U,
+                                      const Number &gamma) const;
+
+      /**
        * Returns whether the state @p U is admissible. If @p U is a
        * vectorized state then @p U is admissible if all vectorized values
        * are admissible.
@@ -1212,6 +1223,26 @@ namespace ryujin
       return positive_part(gamma - Number(1.)) *
                  safe_division(rho_e - rho * q, covolume) -
              gamma * pinf;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystemView<dim, Number>::surrogate_speed_of_sound(
+        const state_type &U, const Number &gamma) const
+    {
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
+
+      const auto rho = density(U);
+      const auto rho_e = internal_energy(U);
+      const auto covolume = Number(1.) - b * rho;
+
+      auto radicand =
+          (rho_e - rho * q - pinf * covolume) / (covolume * covolume * rho);
+      radicand *= gamma * (gamma - 1.);
+      return std::sqrt(positive_part(radicand));
     }
 
 
