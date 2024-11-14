@@ -6,6 +6,7 @@
 #pragma once
 
 #include "hyperbolic_system.h"
+#include "mpi_ensemble.h"
 #include "parabolic_system.h"
 
 #include <initial_values.h>
@@ -36,7 +37,7 @@ namespace ryujin
      * Constructor.
      */
     StubSolver(
-        const MPI_Comm & /*mpi_communicator*/,
+        const MPIEnsemble & /*mpi_ensemle*/,
         std::map<std::string, dealii::Timer> & /*computing_timer*/,
         const HyperbolicSystem & /*hyperbolic_system*/,
         const ParabolicSystem & /*parabolic_system*/,

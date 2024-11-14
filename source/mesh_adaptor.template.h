@@ -13,13 +13,13 @@ namespace ryujin
 {
   template <typename Description, int dim, typename Number>
   MeshAdaptor<Description, dim, Number>::MeshAdaptor(
-      const MPI_Comm &mpi_communicator,
+      const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
-      , mpi_communicator_(mpi_communicator)
+      , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)

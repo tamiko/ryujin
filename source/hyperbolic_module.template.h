@@ -7,6 +7,7 @@
 
 #include "hyperbolic_module.h"
 #include "introspection.h"
+#include "mpi_ensemble.h"
 #include "openmp.h"
 #include "scope.h"
 #include "simd.h"
@@ -26,7 +27,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   HyperbolicModule<Description, dim, Number>::HyperbolicModule(
-      const MPI_Comm &mpi_communicator,
+      const MPIEnsemble &mpi_ensemble,
       std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
@@ -37,7 +38,7 @@ namespace ryujin
       , indicator_parameters_(subsection + "/indicator")
       , limiter_parameters_(subsection + "/limiter")
       , riemann_solver_parameters_(subsection + "/riemann solver")
-      , mpi_communicator_(mpi_communicator)
+      , mpi_ensemble_(mpi_ensemble)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
@@ -567,8 +568,12 @@ namespace ryujin
       Scope scope(computing_timer_,
                   "time step [H] _ - synchronization barriers");
 
-      /* MPI Barrier: */
-      tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
+      /*
+       * MPI Barrier: Synchronize the maximal time-step size. This has to
+       * happen either over the global, or the local subrange communicator:
+       */
+      tau_max.store(Utilities::MPI::min(
+          tau_max.load(), mpi_ensemble_.synchronization_communicator()));
 
       AssertThrow(
           !std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
@@ -1191,8 +1196,15 @@ namespace ryujin
       Scope scope(computing_timer_,
                   "time step [H] _ - synchronization barriers");
 
-      restart_needed.store(
-          Utilities::MPI::logical_or(restart_needed.load(), mpi_communicator_));
+      /*
+       * Synchronize whether we have to restart the time step. Even though
+       * the restart condition itself only affects the local ensemble we
+       * nevertheless need to synchronize the boolean in case we perform
+       * synchronized global time steps. (Otherwise different ensembles
+       * might end up with a different time step.)
+       */
+      restart_needed.store(Utilities::MPI::logical_or(
+          restart_needed.load(), mpi_ensemble_.synchronization_communicator()));
     }
 
     if (restart_needed) {

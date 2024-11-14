@@ -11,6 +11,7 @@
 #include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "mesh_adaptor.h"
+#include "mpi_ensemble.h"
 #include "offline_data.h"
 #include "parabolic_module.h"
 #include "postprocessor.h"
@@ -152,6 +153,7 @@ namespace ryujin
     //@{
 
     std::string base_name_;
+    std::string base_name_ensemble_;
 
     std::string debug_filename_;
 
@@ -186,7 +188,7 @@ namespace ryujin
      */
     //@{
 
-    const MPI_Comm &mpi_communicator_;
+    MPIEnsemble mpi_ensemble_;
 
     std::map<std::string, dealii::Timer> computing_timer_;
 
@@ -203,8 +205,7 @@ namespace ryujin
     VTUOutput<Description, dim, Number> vtu_output_;
     Quantities<Description, dim, Number> quantities_;
 
-    const unsigned int mpi_rank_;
-    const unsigned int n_mpi_processes_;
+    dealii::types::global_dof_index n_global_dofs_;
 
     std::ofstream logfile_; /* log file */
 
