@@ -620,7 +620,9 @@ namespace ryujin
       template <int component>
       state_type prescribe_riemann_characteristic(
           const state_type &U,
+          const Number &p,
           const state_type &U_bar,
+          const Number &p_bar,
           const dealii::Tensor<1, dim, Number> &normal) const;
 
       /**
@@ -1284,69 +1286,136 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::prescribe_riemann_characteristic(
         const state_type &U,
+        const Number &p,
         const state_type &U_bar,
+        const Number &p_bar,
         const dealii::Tensor<1, dim, Number> &normal) const -> state_type
     {
-      __builtin_trap(); // untested and likely needs to be refactored
-
       static_assert(component == 1 || component == 2,
                     "component has to be 1 or 2");
+
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
+
+      /*
+       * The "four" Riemann characteristics are formed under the assumption
+       * of a locally isentropic flow. For this, we first transform both
+       * states into {rho, vn, vperp, gamma, a}, where we use the NASG EOS
+       * interpolation to derive a surrogate gamma and speed of sound a.
+       */
 
       const auto m = momentum(U);
       const auto rho = density(U);
       const auto vn = m * normal / rho;
 
-      const auto p = surrogate_pressure(U); // FIXME: discuss
       const auto gamma = surrogate_gamma(U, p);
-      const auto interpolation_b = ScalarNumber(eos_interpolation_b());
-      const auto x = Number(1.) - interpolation_b * rho;
-      const auto a = std::sqrt(gamma * p / (rho * x)); // local speed of sound
-
+      const auto a = surrogate_speed_of_sound(U, gamma);
 
       const auto m_bar = momentum(U_bar);
       const auto rho_bar = density(U_bar);
       const auto vn_bar = m_bar * normal / rho_bar;
 
-      const auto p_bar = surrogate_pressure(U_bar); // FIXME: discuss
       const auto gamma_bar = surrogate_gamma(U_bar, p_bar);
-      const auto x_bar = Number(1.) - interpolation_b * rho_bar;
-      const auto a_bar = std::sqrt(gamma_bar * p_bar / (rho_bar * x_bar));
+      const auto a_bar = surrogate_speed_of_sound(U_bar, gamma_bar);
 
-      /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
+      /*
+       * Now compute the Riemann characteristics {R_1, R_2, vperp, s}:
+       *   R_1 = v* n - 2 / (gamma - 1) * a
+       *   R_2 = v* n + 2 / (gamma - 1) * a
+       *   vperp
+       *   S = (p + p_infty) / rho^gamma * (1 - b * rho)^gamma
+       *
+       * Here, we replace either R_1, or R_2 with values coming from U_bar:
+       */
 
-      const auto R_1 = component == 1
-                           ? vn_bar - 2. * a_bar / (gamma_bar - 1.) * x_bar
-                           : vn - 2. * a / (gamma - 1.) * x;
+      const auto R_1 = component == 1 ? vn_bar - 2. * a_bar / (gamma_bar - 1.)
+                                      : vn - 2. * a / (gamma - 1.);
 
-      /* Second Riemann characteristic: v* n + 2 / (gamma - 1) * a */
+      const auto R_2 = component == 2 ? vn_bar + 2. * a_bar / (gamma_bar - 1.)
+                                      : vn + 2. * a / (gamma - 1.);
 
-      const auto R_2 = component == 2
-                           ? vn_bar + 2. * a_bar / (gamma_bar - 1.) * x_bar
-                           : vn + 2. * a / (gamma - 1.) * x;
+      /*
+       * Note that we are really hoping for the best here... We require
+       * that R_2 >= R_1 so that we can extract a valid sound speed...
+       */
 
-      const auto s = p / ryujin::pow(rho, gamma) * ryujin::pow(x, gamma);
+      Assert(
+          R_2 >= R_1,
+          dealii::ExcMessage("Encountered R_2 < R_1 in dynamic boundary value "
+                             "enforcement. This implies that the interpolation "
+                             "with Riemann characteristics failed."));
 
       const auto vperp = m / rho - vn * normal;
 
+      const auto S = (p + pinf) * ryujin::pow(1. / rho - b, gamma);
+
+      /*
+       * Now, we have to reconstruct the actual conserved state U from the
+       * Riemann characteristics R_1, R_2, vperp, and s. We first set up
+       * {vn_new, vperp_new, a_new, S} and then solve for {rho_new, p_new}
+       * with the help of the NASG EOS surrogate formulas:
+       *
+       *   S = (p + p_infty) / rho^gamma * (1 - b * rho)^gamma
+       *
+       *   a^2 = gamma * (p + p_infty) / (rho * cov)
+       *
+       *   This implies:
+       *
+       *   a^2 / (gamma * S) = rho^{gamma - 1} / (1 - b * rho)^{1 + gamma}
+       */
+
       const auto vn_new = 0.5 * (R_1 + R_2);
+      const auto a_new_square =
+          ryujin::fixed_power<2>((gamma - 1.) / 4. * (R_2 - R_1));
 
-      auto rho_new =
-          1. / (gamma * s) * ryujin::pow((gamma - 1.) / 4. * (R_2 - R_1), 2.);
-      rho_new =
-          1. / (ryujin::pow(rho_new, 1. / (1. - gamma)) + interpolation_b);
+      /*
+       * Technically, we would need to solve for rho in the following
+       * nonlinear relationship:
+       *
+       *   a^2 / (gamma * S) = rho^{gamma - 1} / (1 - b * rho)^{gamma + 1}
+       *
+       * This seems to be a bit expensive for the fact that our dynamic
+       * boundary conditions are already terribly heuristic...
+       *
+       * So instead, we rewrite the system as:
+       *
+       *   a^2 / (gamma * S) (1 - b * rho)^2
+       *                           = (rho / (1 - b * rho))^{gamma - 1}
+       *
+       * And compute the term on the left simply with the old covolume
+       * and then solve the easier nonlinear equation on the right hand
+       * side:
+       *
+       *   A = {a^2 / (gamma * S) (1 - b * rho)^{2 gamma}}^{1/(gamma - 1)}
+       *   rho = A / (1 + b * A)
+       */
 
-      const auto x_new = 1. - interpolation_b * rho_new;
+      auto term = ryujin::pow(a_new_square / (gamma * S), 1. / (gamma - 1.));
+      if (b != ScalarNumber(0.)) {
+        const auto covolume = 1. - b * rho;
+        term *= std::pow(covolume, 2. / (gamma - 1.));
+      }
 
-      const auto p_new =
-          s * std::pow(rho_new, gamma) / ryujin::pow(x_new, gamma);
+      const auto rho_new = term / (1. + b * term);
+
+      const auto covolume_new = (1. - b * rho_new);
+      const auto p_new = a_new_square / gamma * rho_new * covolume_new - pinf;
+
+      /*
+       * And translate back into conserved quantities:
+       */
+
+      const auto rho_e_new =
+          rho_new * q + (p_new + gamma * pinf) * covolume_new / (gamma - 1.);
 
       state_type U_new;
       U_new[0] = rho_new;
       for (unsigned int d = 0; d < dim; ++d) {
         U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
       }
-      U_new[1 + dim] = p_new / (gamma - 1.) +
-                       0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
+      U_new[1 + dim] =
+          rho_e_new + 0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
 
       return U_new;
     }
@@ -1383,8 +1452,6 @@ namespace ryujin
           result[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
-        __builtin_trap(); // untested and likely needs to be refactored
-#if 0
         /*
          * On dynamic boundary conditions, we distinguish four cases:
          *
@@ -1399,7 +1466,16 @@ namespace ryujin
          */
         const auto m = momentum(U);
         const auto rho = density(U);
-        const auto a = speed_of_sound(U);
+        const auto rho_e = internal_energy(U);
+
+        /*
+         * We do not have precomputed values available. Thus, simply query
+         * the pressure oracle and compute a surrogate speed of sound from
+         * there:
+         */
+        const auto p = eos_pressure(rho, rho_e / rho);
+        const auto gamma = surrogate_gamma(U, p);
+        const auto a = surrogate_speed_of_sound(U, gamma);
         const auto vn = m * normal / rho;
 
         /* Supersonic inflow: */
@@ -1410,16 +1486,27 @@ namespace ryujin
         /* Subsonic inflow: */
         if (vn >= -a && vn <= 0.) {
           const auto U_dirichlet = get_dirichlet_data();
-          result = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+          const auto rho_dirichlet = density(U_dirichlet);
+          const auto rho_e_dirichlet = internal_energy(U_dirichlet);
+          const auto p_dirichlet =
+              eos_pressure(rho_dirichlet, rho_e_dirichlet / rho_dirichlet);
+
+          result = prescribe_riemann_characteristic<2>(
+              U_dirichlet, p_dirichlet, U, p, normal);
         }
 
         /* Subsonic outflow: */
         if (vn > 0. && vn <= a) {
           const auto U_dirichlet = get_dirichlet_data();
-          result = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
+          const auto rho_dirichlet = density(U_dirichlet);
+          const auto rho_e_dirichlet = internal_energy(U_dirichlet);
+          const auto p_dirichlet =
+              eos_pressure(rho_dirichlet, rho_e_dirichlet / rho_dirichlet);
+
+          result = prescribe_riemann_characteristic<1>(
+              U, p, U_dirichlet, p_dirichlet, normal);
         }
         /* Supersonic outflow: do nothing, i.e., keep U as is */
-#endif
 
       } else {
         AssertThrow(false, dealii::ExcNotImplemented());
