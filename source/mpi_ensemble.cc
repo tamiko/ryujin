@@ -44,6 +44,14 @@ namespace ryujin
     AssertThrow(n_ensembles_ > 0, dealii::ExcInternalError());
     ensemble_ = world_rank_ % n_ensembles_;
 
+    AssertThrow(
+        n_world_ranks_ >= n_ensembles_,
+        dealii::ExcMessage(
+            "The number of (global) MPI processes must be equal to or larger "
+            "than the number of ensembles. But we are trying to run " +
+            std::to_string(n_ensembles_) + " ensembles on " +
+            std::to_string(n_world_ranks_) + " MPI processes."));
+
     /*
      * For each ensemble we create an MPI group with a ensemble-local
      * communicator. This allows to do ensemble-independent time-stepping.
