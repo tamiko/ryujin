@@ -1010,9 +1010,6 @@ namespace ryujin
 
         /* Supersonic outflow: do nothing, i.e., keep U as is */
 
-      } else if (id == Boundary::do_nothing) {
-        /* Do nothing */
-
       } else {
         AssertThrow(false, dealii::ExcNotImplemented());
       }
