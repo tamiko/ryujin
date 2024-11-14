@@ -958,14 +958,10 @@ namespace ryujin
         result = get_dirichlet_data();
 
       } else if (id == Boundary::dirichlet_momentum) {
-        /*
-         * For some benchmarks for the Shallow Water Equations, only the
-         * momentum is enforced. We "do nothing" for the water
-         * depth.
-         */
-        auto m_dir = momentum(get_dirichlet_data());
+        /* Only enforce Dirichlet conditions on the momentum: */
+        auto m_dirichlet = momentum(get_dirichlet_data());
         for (unsigned int k = 0; k < dim; ++k)
-          result[k + 1] = m_dir[k];
+          result[k + 1] = m_dirichlet[k];
 
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
@@ -1013,6 +1009,12 @@ namespace ryujin
         }
 
         /* Supersonic outflow: do nothing, i.e., keep U as is */
+
+      } else if (id == Boundary::do_nothing) {
+        /* Do nothing */
+
+      } else {
+        AssertThrow(false, dealii::ExcNotImplemented());
       }
 
       return result;
