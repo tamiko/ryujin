@@ -394,7 +394,7 @@ namespace ryujin
       static inline const auto precomputed_names =
           std::array<std::string, n_precomputed_values>{
               {"p",
-               "surrogate_gamma",
+               "surrogate_gamma_min",
                "surrogate_specific_entropy",
                "surrogate_harten_entropy"}};
 
