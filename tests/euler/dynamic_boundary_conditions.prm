@@ -23,7 +23,7 @@ subsection B - Equation
   set dimension = 2
   set equation  = euler
 
-  set gamma          = 1.80
+  set gamma     = 1.80
 end
 
 subsection C - Discretization
@@ -47,7 +47,6 @@ subsection E - InitialValues
   set position      =  0,  0
 
   subsection isentropic vortex
-    set gamma       = 1.8
     set mach number = 0
     set beta        = 5
   end
