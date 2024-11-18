@@ -49,6 +49,13 @@ namespace ryujin
       ACCESSOR_READ_ONLY(lambda)
       ACCESSOR_READ_ONLY(cv_inverse_kappa)
 
+      unsigned int n_parabolic_state_vectors() const
+      {
+        return parabolic_component_names_.size();
+      }
+
+      ACCESSOR_READ_ONLY(parabolic_component_names);
+
     private:
       /**
        * @name Runtime parameters, internal fields and methods
@@ -60,6 +67,8 @@ namespace ryujin
       double cv_inverse_kappa_;
 
       //@}
+
+      const std::vector<std::string> parabolic_component_names_;
     }; /* ParabolicSystem */
 
 

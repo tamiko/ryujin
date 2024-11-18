@@ -38,6 +38,16 @@ namespace ryujin
        * Constructor.
        */
       ParabolicSystem(const std::string &subsection = "/ParabolicSystem");
+
+      unsigned int n_parabolic_state_vectors() const
+      {
+        return parabolic_component_names_.size();
+      }
+
+      ACCESSOR_READ_ONLY(parabolic_component_names);
+
+    private:
+      const std::vector<std::string> parabolic_component_names_;
     }; /* ParabolicSystem */
 
 
