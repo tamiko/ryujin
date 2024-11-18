@@ -109,9 +109,10 @@ namespace ryujin
       double speed_of_sound(double rho, double e) const final
       {
         const auto covolume = 1. - b_ * rho;
-        auto numerator = (rho * (e - q_) - pinf_ * covolume) / rho;
-        numerator *= gamma_ * (gamma_ - 1.);
-        return std::sqrt(numerator) / covolume;
+        auto radicand =
+            (rho * (e - q_) - pinf_ * covolume) / (covolume * covolume * rho);
+        radicand *= gamma_ * (gamma_ - 1.);
+        return std::sqrt(radicand);
       }
 
     private:
