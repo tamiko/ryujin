@@ -141,7 +141,11 @@ namespace ryujin
       const Number gamma_M = std::max(gamma_i, gamma_j);
 
       const Number numerator =
-          positive_part(alpha_hat_min + alpha_max - (u_j - u_i));
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
+              p_max + pinf,
+              Number(0.),
+              Number(0.),
+              positive_part(alpha_hat_min + alpha_max - (u_j - u_i)));
 
       /*
        * The admissible set is p_min >= pinf. But numerically let's avoid
@@ -165,7 +169,9 @@ namespace ryujin
 
       const Number first_exponent =
           (gamma_M - Number(1.)) / (ScalarNumber(2.) * gamma_M);
-      const Number first_exponent_inverse = Number(1.) / first_exponent;
+
+      const Number first_exponent_inverse =
+          safe_division(Number(1.), first_exponent);
 
       const Number first_denom =
           alpha_hat_min * ryujin::pow(p_ratio, r_exponent - first_exponent) +
@@ -175,6 +181,7 @@ namespace ryujin
           (p_max + pinf) * ryujin::pow(safe_division(numerator, first_denom),
                                        first_exponent_inverse) -
           pinf;
+
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "RS p_1_tilde  = " << p_1_tilde << "\n";
 #endif
@@ -186,7 +193,9 @@ namespace ryujin
 
       const Number second_exponent =
           (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
-      const Number second_exponent_inverse = Number(1.) / second_exponent;
+
+      const Number second_exponent_inverse =
+          safe_division(Number(1.), second_exponent);
 
       Number second_denom =
           alpha_hat_min * ryujin::pow(p_ratio, -second_exponent) +
@@ -233,7 +242,11 @@ namespace ryujin
       const Number exponent_inverse = Number(1.) / exponent;
 
       const Number numerator =
-          positive_part(alpha_hat_i + alpha_hat_j - (u_j - u_i));
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
+              p_j + pinf,
+              Number(0.),
+              Number(0.),
+              positive_part(alpha_hat_i + alpha_hat_j - (u_j - u_i)));
 
       const Number denominator =
           alpha_hat_i *
@@ -291,7 +304,10 @@ namespace ryujin
       const Number x_j = std::sqrt(radicand_j);
 
       const Number a = x_i + x_j;
-      const Number b = u_j - u_i;
+      const Number b =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
+              a, Number(0.), Number(0.), u_j - u_i);
+
       const Number c = -(p_i + pinf) * x_i - (p_j + pinf) * x_j;
 
       const Number base = safe_division(
