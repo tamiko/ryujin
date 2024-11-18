@@ -1303,6 +1303,9 @@ namespace ryujin
        * of a locally isentropic flow. For this, we first transform both
        * states into {rho, vn, vperp, gamma, a}, where we use the NASG EOS
        * interpolation to derive a surrogate gamma and speed of sound a.
+       *
+       * See, e.g., https://arxiv.org/pdf/2004.08750, "Compressible flow in
+       * a NOble-Abel Stiffened-Gas fluid", M. I. Radulescu.
        */
 
       const auto m = momentum(U);
@@ -1311,6 +1314,7 @@ namespace ryujin
 
       const auto gamma = surrogate_gamma(U, p);
       const auto a = surrogate_speed_of_sound(U, gamma);
+      const auto covolume = 1. - b * rho;
 
       const auto m_bar = momentum(U_bar);
       const auto rho_bar = density(U_bar);
@@ -1318,22 +1322,25 @@ namespace ryujin
 
       const auto gamma_bar = surrogate_gamma(U_bar, p_bar);
       const auto a_bar = surrogate_speed_of_sound(U_bar, gamma_bar);
+      const auto covolume_bar = 1. - b * rho_bar;
 
       /*
        * Now compute the Riemann characteristics {R_1, R_2, vperp, s}:
-       *   R_1 = v* n - 2 / (gamma - 1) * a
-       *   R_2 = v* n + 2 / (gamma - 1) * a
+       *   R_1 = v * n - 2 / (gamma - 1) * a * (1 - b * rho)
+       *   R_2 = v * n + 2 / (gamma - 1) * a * (1 - b * rho)
        *   vperp
        *   S = (p + p_infty) / rho^gamma * (1 - b * rho)^gamma
        *
        * Here, we replace either R_1, or R_2 with values coming from U_bar:
        */
 
-      const auto R_1 = component == 1 ? vn_bar - 2. * a_bar / (gamma_bar - 1.)
-                                      : vn - 2. * a / (gamma - 1.);
+      const auto R_1 =
+          component == 1 ? vn_bar - 2. * a_bar / (gamma_bar - 1.) * covolume_bar
+                         : vn - 2. * a / (gamma - 1.) * covolume;
 
-      const auto R_2 = component == 2 ? vn_bar + 2. * a_bar / (gamma_bar - 1.)
-                                      : vn + 2. * a / (gamma - 1.);
+      const auto R_2 =
+          component == 2 ? vn_bar + 2. * a_bar / (gamma_bar - 1.) * covolume_bar
+                         : vn + 2. * a / (gamma - 1.) * covolume;
 
       /*
        * Note that we are really hoping for the best here... We require
@@ -1366,34 +1373,40 @@ namespace ryujin
        */
 
       const auto vn_new = 0.5 * (R_1 + R_2);
-      const auto a_new_square =
-          ryujin::fixed_power<2>((gamma - 1.) / 4. * (R_2 - R_1));
 
       /*
-       * Technically, we would need to solve for rho in the following
-       * nonlinear relationship:
+       * Technically, we would need to solve for rho subject to a number of
+       * nonlinear relationships:
+       *
+       *   a   = (gamma - 1) * (R_2 - R_1) / (4. * (1 - b * rho))
        *
        *   a^2 / (gamma * S) = rho^{gamma - 1} / (1 - b * rho)^{gamma + 1}
        *
        * This seems to be a bit expensive for the fact that our dynamic
        * boundary conditions are already terribly heuristic...
        *
-       * So instead, we rewrite the system as:
+       * So instead, we rewrite this system as:
+       *
+       *   a * (1 - b * rho) = (gamma - 1) * (R_2 - R_1) / 4.
        *
        *   a^2 / (gamma * S) (1 - b * rho)^2
        *                           = (rho / (1 - b * rho))^{gamma - 1}
        *
-       * And compute the term on the left simply with the old covolume
-       * and then solve the easier nonlinear equation on the right hand
-       * side:
+       * And compute the terms on the left simply with the old covolume and
+       * solving an easier easier nonlinear equation for the density. The
+       * resulting system reads:
        *
-       *   A = {a^2 / (gamma * S) (1 - b * rho)^{2 gamma}}^{1/(gamma - 1)}
+       *   a = (gamma - 1) * (R_2 - R_1) / (4. * (1 - b * rho_old))
+       *   A = {a^2 / (gamma * S) (1 - b * rho_old)^{2 gamma}}^{1/(gamma - 1)}
+       *
        *   rho = A / (1 + b * A)
        */
 
+      const auto a_new_square =
+          ryujin::fixed_power<2>((gamma - 1.) * (R_2 - R_1) / (4. * covolume));
+
       auto term = ryujin::pow(a_new_square / (gamma * S), 1. / (gamma - 1.));
       if (b != ScalarNumber(0.)) {
-        const auto covolume = 1. - b * rho;
         term *= std::pow(covolume, 2. / (gamma - 1.));
       }
 
