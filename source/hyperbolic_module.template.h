@@ -758,9 +758,11 @@ namespace ryujin
 #endif
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-            const auto regularization =
-                T(100. * std::numeric_limits<Number>::min());
-            const auto scaled_c_ij = c_ij / std::max(d_ij, regularization);
+            constexpr auto eps = std::numeric_limits<Number>::epsilon();
+            const auto scale = dealii::compare_and_apply_mask<
+                dealii::SIMDComparison::less_than>(
+                std::abs(d_ij), T(eps * eps), T(0.), T(1.) / d_ij);
+            const auto scaled_c_ij = c_ij * scale;
 
             const auto flux_j = view.flux_contribution(
                 old_precomputed, initial_precomputed_, js, U_j);
