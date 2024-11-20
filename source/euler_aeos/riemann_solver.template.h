@@ -580,8 +580,8 @@ namespace ryujin
 #ifdef EXPENSIVE_BOUNDS_CHECK
       AssertThrowSIMD(
           Number(p + pinf),
-          [](auto val) { return val > ScalarNumber(0.); },
-          dealii::ExcMessage("Internal error: p + pinf <= 0."));
+          [](auto val) { return val >= ScalarNumber(0.); },
+          dealii::ExcMessage("Internal error: p + pinf < 0."));
 
       AssertThrowSIMD(
           x,
@@ -590,8 +590,8 @@ namespace ryujin
 
       AssertThrowSIMD(
           gamma,
-          [](auto val) { return val > ScalarNumber(1.); },
-          dealii::ExcMessage("Internal error: gamma <= 1."));
+          [](auto val) { return val >= ScalarNumber(1.); },
+          dealii::ExcMessage("Internal error: gamma < 1."));
 #endif
 
       return {{rho, proj_m * rho_inverse, p, gamma, a}};
