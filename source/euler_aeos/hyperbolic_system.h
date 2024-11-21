@@ -1133,7 +1133,8 @@ namespace ryujin
 
       const auto rho_pinfcov = rho * pinf * covolume;
 
-      return ryujin::pow((rho_rho_e_q - rho_pinfcov) * covolume_term, exponent);
+      return ryujin::pow(
+          positive_part(rho_rho_e_q - rho_pinfcov) * covolume_term, exponent);
     }
 
 
@@ -1171,9 +1172,12 @@ namespace ryujin
       const auto shift = rho * E - ScalarNumber(0.5) * m.norm_square() -
                          rho * rho * q - rho * pinf * covolume;
 
-      const auto factor = ryujin::pow(eta * covolume_inverse, -gamma_min) *
-                          fixed_power<2>(covolume_inverse) /
-                          (gamma_min + Number(1.));
+      constexpr auto eps = std::numeric_limits<ScalarNumber>::epsilon();
+      const auto regularization = m.norm() * eps;
+
+      auto factor = ryujin::pow(
+          std::max(regularization, eta * covolume_inverse), -gamma_min);
+      factor *= fixed_power<2>(covolume_inverse) / (gamma_min + Number(1.));
 
       state_type result;
 
