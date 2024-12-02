@@ -61,7 +61,7 @@ namespace ryujin
      * Constructor
      */
     SolutionTransfer(const MPIEnsemble &mpi_ensemble,
-                     Discretization<dim>::Triangulation &triangulation,
+                     typename Discretization<dim>::Triangulation &triangulation,
                      const OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
                      const ParabolicSystem &parabolic_system);
