@@ -32,12 +32,12 @@ namespace ryujin
 {
   template <typename Description, int dim, typename Number>
   SolutionTransfer<Description, dim, Number>::SolutionTransfer(
-      const MPI_Comm &mpi_communicator,
+      const MPIEnsemble &mpi_ensemble,
       Discretization<dim>::Triangulation &triangulation,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system)
-      : mpi_communicator_(mpi_communicator)
+      : mpi_ensemble_(mpi_ensemble)
       , triangulation_(&triangulation)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)

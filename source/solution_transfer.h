@@ -7,6 +7,7 @@
 
 #include <compile_time_options.h>
 
+#include "mpi_ensemble.h"
 #include "offline_data.h"
 #include "state_vector.h"
 
@@ -59,7 +60,7 @@ namespace ryujin
     /**
      * Constructor
      */
-    SolutionTransfer(const MPI_Comm &mpi_communicator,
+    SolutionTransfer(const MPIEnsemble &mpi_ensemble,
                      Discretization<dim>::Triangulation &triangulation,
                      const OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
@@ -138,7 +139,7 @@ namespace ryujin
      */
     //@{
 
-    const MPI_Comm &mpi_communicator_;
+    const MPIEnsemble &mpi_ensemble_;
 
     dealii::SmartPointer<typename Discretization<dim>::Triangulation>
         triangulation_;
