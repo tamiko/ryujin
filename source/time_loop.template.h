@@ -6,6 +6,7 @@
 #pragma once
 
 #include "scope.h"
+#include "solution_transfer.h"
 #include "time_loop.h"
 #include "version_info.h"
 
@@ -499,12 +500,13 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
+    unsigned int transfer_handle;
     if (mpi_ensemble_.ensemble_rank() == 0) {
       std::string meta = name + ".metadata";
 
       std::ifstream file(meta, std::ios::binary);
       boost::archive::binary_iarchive ia(file);
-      ia >> t >> output_cycle;
+      ia >> t >> output_cycle >> transfer_handle;
     }
 
     int ierr;
@@ -523,43 +525,28 @@ namespace ryujin
                      mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
 
+    ierr = MPI_Bcast(&transfer_handle,
+                     1,
+                     MPI_UNSIGNED,
+                     0,
+                     mpi_ensemble_.ensemble_communicator());
+    AssertThrowMPI(ierr);
+
     /*
      * Now read in the state vector:
      */
 
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
-    auto &U = std::get<0>(state_vector);
 
-    const auto &dof_handler = offline_data_.dof_handler();
-    const auto &scalar_partitioner = offline_data_.scalar_partitioner();
+    SolutionTransfer<Description, dim, Number> solution_transfer(
+        mpi_ensemble_.ensemble_communicator(),
+        /* we need write access: */ discretization_.triangulation(),
+        offline_data_,
+        hyperbolic_system_,
+        parabolic_system_);
 
-    /* Create temporary scalar component vectors: */
-
-    using ScalarVector = typename Vectors::ScalarVector<Number>;
-    std::array<ScalarVector, problem_dimension> states;
-    for (auto &it : states) {
-      it.reinit(scalar_partitioner);
-    }
-
-    /* Create SolutionTransfer object, attach state vector and deserialize:
-     */
-
-    dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
-        solution_transfer(dof_handler);
-
-    std::vector<ScalarVector *> ptr_state;
-    std::transform(states.begin(),
-                   states.end(),
-                   std::back_inserter(ptr_state),
-                   [](auto &it) { return &it; });
-
-    solution_transfer.deserialize(ptr_state);
-
-    unsigned int d = 0;
-    for (auto &it : states) {
-      U.insert_component(it, d++);
-    }
-    U.update_ghost_values();
+    solution_transfer.set_handle(transfer_handle);
+    solution_transfer.project(state_vector);
   }
 
 
@@ -583,30 +570,16 @@ namespace ryujin
      * Create SolutionTransfer object, attach state vector and write out:
      */
 
-    const auto &triangulation = discretization_.triangulation();
-    const auto &dof_handler = offline_data_.dof_handler();
-    const auto &scalar_partitioner = offline_data_.scalar_partitioner();
-    auto &U = std::get<0>(state_vector);
+    SolutionTransfer<Description, dim, Number> solution_transfer(
+        mpi_ensemble_,
+        /* we need write access: */ discretization_.triangulation(),
+        offline_data_,
+        hyperbolic_system_,
+        parabolic_system_);
 
-    using ScalarVector = typename Vectors::ScalarVector<Number>;
-    std::array<ScalarVector, problem_dimension> states;
-    unsigned int d = 0;
-    for (auto &it : states) {
-      it.reinit(scalar_partitioner);
-      U.extract_component(it, d++);
-    }
-
-    /* Create SolutionTransfer object, attach state vector and write out: */
-
-    dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
-        solution_transfer(dof_handler);
-
-    std::vector<const ScalarVector *> ptr_state;
-    std::transform(states.begin(),
-                   states.end(),
-                   std::back_inserter(ptr_state),
-                   [](auto &it) { return &it; });
-    solution_transfer.prepare_for_serialization(ptr_state);
+    /* need hyperbolic_module.prepare_state_vector() prior to this call: */
+    solution_transfer.prepare_projection(state_vector);
+    const auto transfer_handle = solution_transfer.get_handle();
 
     std::string name = base_name + "-checkpoint";
 
@@ -620,6 +593,7 @@ namespace ryujin
 #if !DEAL_II_VERSION_GTE(9, 6, 0)
     if constexpr (have_distributed_triangulation<dim>) {
 #endif
+      const auto &triangulation = discretization_.triangulation();
       triangulation.save(name + ".mesh");
 #if !DEAL_II_VERSION_GTE(9, 6, 0)
     }
@@ -633,7 +607,7 @@ namespace ryujin
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);
-      oa << t << output_cycle;
+      oa << t << output_cycle << transfer_handle;
     }
 
     const int ierr = MPI_Barrier(mpi_ensemble_.ensemble_communicator());
@@ -666,30 +640,15 @@ namespace ryujin
      * Set up SolutionTransfer:
      */
 
-    const auto &dof_handler = offline_data_.dof_handler();
-    const auto &scalar_partitioner = offline_data_.scalar_partitioner();
-    auto &U = std::get<0>(state_vector);
+    SolutionTransfer<Description, dim, Number> solution_transfer(
+        mpi_ensemble_,
+        /* we need write access: */ discretization_.triangulation(),
+        offline_data_,
+        hyperbolic_system_,
+        parabolic_system_);
 
-    using ScalarVector = typename Vectors::ScalarVector<Number>;
-    std::array<ScalarVector, problem_dimension> states;
-    unsigned int d = 0;
-    for (auto &it : states) {
-      it.reinit(scalar_partitioner);
-      U.extract_component(it, d++);
-    }
-
-    /* Create SolutionTransfer object, attach state vector and write out: */
-
-    dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
-        solution_transfer(dof_handler);
-
-    std::vector<const ScalarVector *> ptr_state;
-    std::transform(states.begin(),
-                   states.end(),
-                   std::back_inserter(ptr_state),
-                   [](auto &it) { return &it; });
-
-    solution_transfer.prepare_for_coarsening_and_refinement(ptr_state);
+    /* need hyperbolic_module.prepare_state_vector() prior to this call: */
+    solution_transfer.prepare_projection(state_vector);
 
     /*
      * Execute mesh adaptation and project old state to new state vector:
@@ -699,25 +658,7 @@ namespace ryujin
     prepare_compute_kernels();
 
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
-
-    std::vector<ScalarVector> interpolated_state;
-    interpolated_state.resize(problem_dimension);
-    for (auto &it : interpolated_state) {
-      it.reinit(scalar_partitioner);
-      it.zero_out_ghost_values();
-    }
-
-    std::vector<ScalarVector *> ptr_interpolated_state;
-    std::transform(interpolated_state.begin(),
-                   interpolated_state.end(),
-                   std::back_inserter(ptr_interpolated_state),
-                   [](auto &it) { return &it; });
-    solution_transfer.interpolate(ptr_interpolated_state);
-
-    for (unsigned int k = 0; k < problem_dimension; ++k) {
-      U.insert_component(interpolated_state[k], k);
-    }
-    U.update_ghost_values();
+    solution_transfer.project(state_vector);
   }
 
 

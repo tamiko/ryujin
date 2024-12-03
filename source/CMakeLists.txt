@@ -48,6 +48,7 @@ set(DEPENDENT_SOURCE_FILES
   parabolic_module.cc
   postprocessor.cc
   quantities.cc
+  solution_transfer.cc
   time_integrator.cc
   time_loop.cc
   vtu_output.cc

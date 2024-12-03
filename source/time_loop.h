@@ -102,7 +102,8 @@ namespace ryujin
      * function writes out the state to disk using boost::archive for
      * serialization.
      *
-     * @pre the state_vector needs to be prepared.
+     * @pre the state_vector has to have been prepared prior to a call to
+     * write_checkpoint().
      */
     void write_checkpoint(const StateVector &state_vector,
                           const std::string &base_name,
