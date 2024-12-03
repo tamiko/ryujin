@@ -14,7 +14,9 @@
 #include <deal.II/distributed/tria.h>
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/dofs/dof_tools.h>
+#if DEAL_II_VERSION_GTE(9, 6, 0)
 #include <deal.II/grid/cell_status.h>
+#endif
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/lac/block_vector.h>
@@ -124,7 +126,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void SolutionTransfer<Description, dim, Number>::prepare_projection(
-      const StateVector &old_state_vector)
+      const StateVector &old_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
     std::cout
@@ -132,6 +134,13 @@ namespace ryujin
         << std::endl;
 #endif
 
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    AssertThrow(
+        false,
+        dealii::ExcMessage(
+            "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
+
+#else
     AssertThrow(have_distributed_triangulation<dim>,
                 dealii::ExcMessage(
                     "The SolutionTransfer class is not implemented for a "
@@ -310,6 +319,7 @@ namespace ryujin
           return pack_state_values(state_values);
         },
         /* returns_variable_size_data =*/false);
+#endif
   }
 
 
@@ -321,6 +331,14 @@ namespace ryujin
     std::cout << "SolutionTransfer<Description, dim, Number>::project()"
               << std::endl;
 #endif
+
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    AssertThrow(
+        false,
+        dealii::ExcMessage(
+            "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
+
+#else
 
     AssertThrow(have_distributed_triangulation<dim>,
                 dealii::ExcMessage(
@@ -597,6 +615,7 @@ namespace ryujin
                  "SolutionTransfer::projection(): something went wrong. Final "
                  "masses do not agree with those computed in OfflineData."));
     }
+#endif
 #endif
   }
 } // namespace ryujin
