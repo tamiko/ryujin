@@ -187,6 +187,13 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void MeshAdaptor<Description, dim, Number>::compute_kelly_indicators() const
   {
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    AssertThrow(
+        false,
+        dealii::ExcMessage("The MeshAdaptor::compute_kelly_indicators() method "
+                           "needs deal.II version 9.6.0 or newer"));
+#else
+
     /*
      * Calculate a Kelly error estimator for each configured quantitity:
      */
@@ -221,6 +228,7 @@ namespace ryujin
     indicators_ = 0.;
     for (const auto &it : kelly_errors)
       indicators_ += it;
+#endif
   }
 
 
