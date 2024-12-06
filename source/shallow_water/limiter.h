@@ -28,7 +28,7 @@ namespace ryujin
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
 
-        if constexpr (std::is_same<ScalarNumber, double>::value)
+        if constexpr (std::is_same_v<ScalarNumber, double>)
           newton_tolerance_ = 1.e-10;
         else
           newton_tolerance_ = 1.e-4;
@@ -115,7 +115,7 @@ namespace ryujin
       /**
        * The number of stored entries in the bounds array.
        */
-      static constexpr unsigned int n_bounds = 4;
+      static constexpr unsigned int n_bounds = 3;
 
       /**
        * Array type used to store accumulated bounds.
@@ -235,11 +235,10 @@ namespace ryujin
     {
       U_i = new_U_i;
 
-      auto &[h_min, h_max, h_small, v2_max] = bounds_;
+      auto &[h_min, h_max, v2_max] = bounds_;
 
       h_min = Number(std::numeric_limits<ScalarNumber>::max());
       h_max = Number(0.);
-      h_small = Number(0.);
       v2_max = Number(0.);
 
       h_relaxation_numerator = Number(0.);
@@ -272,7 +271,7 @@ namespace ryujin
 
       /* Bounds: */
 
-      auto &[h_min, h_max, h_small, v2_max] = bounds_;
+      auto &[h_min, h_max, v2_max] = bounds_;
 
       const auto h_bar_ij = view.water_depth(U_ij_bar);
       h_min = std::min(h_min, h_bar_ij);
@@ -307,10 +306,8 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       auto relaxed_bounds = bounds_;
-      auto &[h_min, h_max, h_small, v2_max] = relaxed_bounds;
+      auto &[h_min, h_max, v2_max] = relaxed_bounds;
 
       /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -336,15 +333,6 @@ namespace ryujin
 
       v2_max = std::min((Number(1.) + r_i) * v2_max, v2_max + v2_relaxed);
 
-      /* Use r_i = 0.2 * (m_i / |Omega|) ^ (1 / d): */
-
-      r_i = hd_i;
-      if constexpr (dim == 2)
-        r_i = std::sqrt(hd_i);
-      r_i *= view.dry_state_relaxation_factor();
-
-      h_small = view.reference_water_depth() * r_i;
-
       return relaxed_bounds;
     }
 
@@ -354,12 +342,11 @@ namespace ryujin
     Limiter<dim, Number>::combine_bounds(const Bounds &bounds_l,
                                          const Bounds &bounds_r) -> Bounds
     {
-      const auto &[h_min_l, h_max_l, h_small_l, v2_max_l] = bounds_l;
-      const auto &[h_min_r, h_max_r, h_small_r, v2_max_r] = bounds_r;
+      const auto &[h_min_l, h_max_l, v2_max_l] = bounds_l;
+      const auto &[h_min_r, h_max_r, v2_max_r] = bounds_r;
 
       return {std::min(h_min_l, h_min_r),
               std::max(h_max_l, h_max_r),
-              std::min(h_small_l, h_small_r),
               std::max(v2_max_l, v2_max_r)};
     }
 

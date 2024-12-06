@@ -27,7 +27,7 @@ namespace ryujin
       Number t_l = t_min;
       Number t_r = t_max;
 
-      const auto &[h_min, h_max, h_small, v2_max] = bounds;
+      const auto &[h_min, h_max, v2_max] = bounds;
 
       constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
@@ -82,22 +82,16 @@ namespace ryujin
             (h_max - h_U) * denominator,
             t_r);
 
-        /*
-         * Enforce strict limiting on dry states (i.e., if we happen to get
-         * below h_small):
-         */
-        const auto h_min_tilde = std::max(h_small, h_min);
-
         t_r = dealii::compare_and_apply_mask<lt>( //
             h_U + t_r * h_P,
-            h_min_tilde,
+            h_min,
             /*
              * h_P is negative.
              *
              * Note: Do not take an absolute value here. If we are out of
              * bounds we have to ensure that t_r is set to t_min.
              */
-            (h_U - h_min_tilde) * denominator,
+            (h_U - h_min) * denominator,
             t_r);
 
         /*
