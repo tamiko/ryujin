@@ -47,16 +47,6 @@ namespace ryujin
                       relaxation_factor_,
                       "Factor for scaling the relaxation window with r_i = "
                       "factor * (m_i/|Omega|)^(1.5/d).");
-
-        limit_on_kinetic_energy_ = false;
-        add_parameter("limit on kinetic energy",
-                      limit_on_kinetic_energy_,
-                      "Limit on kinetic energy");
-
-        limit_on_square_velocity_ = true;
-        add_parameter("limit on square velocity",
-                      limit_on_square_velocity_,
-                      "Limit on square velocity");
       }
 
       ACCESSOR_READ_ONLY(iterations);
@@ -64,17 +54,11 @@ namespace ryujin
       ACCESSOR_READ_ONLY(newton_max_iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
-      ACCESSOR_READ_ONLY(limit_on_kinetic_energy);
-      ACCESSOR_READ_ONLY(limit_on_square_velocity);
-
     private:
       unsigned int iterations_;
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
       ScalarNumber relaxation_factor_;
-
-      bool limit_on_kinetic_energy_;
-      bool limit_on_square_velocity_;
     };
 
 
@@ -131,7 +115,7 @@ namespace ryujin
       /**
        * The number of stored entries in the bounds array.
        */
-      static constexpr unsigned int n_bounds = 5;
+      static constexpr unsigned int n_bounds = 4;
 
       /**
        * Array type used to store accumulated bounds.
@@ -229,7 +213,6 @@ namespace ryujin
       /* for relaxation */
 
       Number h_relaxation_numerator;
-      Number kin_relaxation_numerator;
       Number v2_relaxation_numerator;
       Number relaxation_denominator;
 
@@ -252,16 +235,14 @@ namespace ryujin
     {
       U_i = new_U_i;
 
-      auto &[h_min, h_max, h_small, kin_max, v2_max] = bounds_;
+      auto &[h_min, h_max, h_small, v2_max] = bounds_;
 
       h_min = Number(std::numeric_limits<ScalarNumber>::max());
       h_max = Number(0.);
       h_small = Number(0.);
-      kin_max = Number(0.);
       v2_max = Number(0.);
 
       h_relaxation_numerator = Number(0.);
-      kin_relaxation_numerator = Number(0.);
       v2_relaxation_numerator = Number(0.);
       relaxation_denominator = Number(0.);
     }
@@ -291,14 +272,11 @@ namespace ryujin
 
       /* Bounds: */
 
-      auto &[h_min, h_max, h_small, kin_max, v2_max] = bounds_;
+      auto &[h_min, h_max, h_small, v2_max] = bounds_;
 
       const auto h_bar_ij = view.water_depth(U_ij_bar);
       h_min = std::min(h_min, h_bar_ij);
       h_max = std::max(h_max, h_bar_ij);
-
-      const auto kin_bar_ij = view.kinetic_energy(U_ij_bar);
-      kin_max = std::max(kin_max, kin_bar_ij);
 
       const auto v_bar_ij = view.momentum(U_ij_bar) *
                             view.inverse_water_depth_mollified(U_ij_bar);
@@ -316,10 +294,6 @@ namespace ryujin
       const auto h_j = view.water_depth(U_j);
       h_relaxation_numerator += beta_ij * (h_i + h_j);
 
-      const auto kin_i = view.kinetic_energy(U_i);
-      const auto kin_j = view.kinetic_energy(U_j);
-      kin_relaxation_numerator += beta_ij * (kin_i + kin_j);
-
       const auto vel_i =
           view.momentum(U_i) * view.inverse_water_depth_mollified(U_i);
       const auto vel_j =
@@ -336,7 +310,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       auto relaxed_bounds = bounds_;
-      auto &[h_min, h_max, h_small, kin_max, v2_max] = relaxed_bounds;
+      auto &[h_min, h_max, h_small, v2_max] = relaxed_bounds;
 
       /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -355,12 +329,6 @@ namespace ryujin
 
       h_min = std::max((Number(1.) - r_i) * h_min, h_min - h_relaxed);
       h_max = std::min((Number(1.) + r_i) * h_max, h_max + h_relaxed);
-
-      const Number kin_relaxed = ScalarNumber(2.) *
-                                 std::abs(kin_relaxation_numerator) /
-                                 (relaxation_denominator + Number(eps));
-
-      kin_max = std::min((Number(1.) + r_i) * kin_max, kin_max + kin_relaxed);
 
       const Number v2_relaxed = ScalarNumber(2.) *
                                 std::abs(v2_relaxation_numerator) /
@@ -386,13 +354,12 @@ namespace ryujin
     Limiter<dim, Number>::combine_bounds(const Bounds &bounds_l,
                                          const Bounds &bounds_r) -> Bounds
     {
-      const auto &[h_min_l, h_max_l, h_small_l, k_max_l, v2_max_l] = bounds_l;
-      const auto &[h_min_r, h_max_r, h_small_r, k_max_r, v2_max_r] = bounds_r;
+      const auto &[h_min_l, h_max_l, h_small_l, v2_max_l] = bounds_l;
+      const auto &[h_min_r, h_max_r, h_small_r, v2_max_r] = bounds_r;
 
       return {std::min(h_min_l, h_min_r),
               std::max(h_max_l, h_max_r),
               std::min(h_small_l, h_small_r),
-              std::max(k_max_l, h_max_r),
               std::max(v2_max_l, v2_max_r)};
     }
 
