@@ -35,7 +35,6 @@ subsection B - Equation
   set manning friction coefficient = 0
 
   set reference water depth        = 2
-  set dry state relaxation factor  = 0
   set dry state relaxation small   = 1e2
   set dry state relaxation large   = 1e4
 end
