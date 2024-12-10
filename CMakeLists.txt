@@ -118,7 +118,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     string(APPEND DEAL_II_CXX_FLAGS " -Wno-overloaded-virtual")
   endif()
 
-
+  if("${NUMBER}" STREQUAL "float")
+    string(APPEND DEAL_II_CXX_FLAGS " -Wno-float-conversion")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
