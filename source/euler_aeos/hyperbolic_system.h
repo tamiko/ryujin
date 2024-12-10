@@ -1359,7 +1359,7 @@ namespace ryujin
 
       const auto vperp = m / rho - vn * normal;
 
-      const auto S = (p + pinf) * ryujin::pow(1. / rho - b, gamma);
+      const auto S = (p + pinf) * ryujin::pow(Number(1.) / rho - b, gamma);
 
       /*
        * Now, we have to reconstruct the actual conserved state U from the
@@ -1376,7 +1376,7 @@ namespace ryujin
        *   a^2 / (gamma * S) = rho^{gamma - 1} / (1 - b * rho)^{1 + gamma}
        */
 
-      const auto vn_new = 0.5 * (R_1 + R_2);
+      const auto vn_new = Number(0.5) * (R_1 + R_2);
 
       /*
        * Technically, we would need to solve for rho subject to a number of
