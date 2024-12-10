@@ -9,6 +9,9 @@
 
 #include "discretization.h"
 #include "solution_transfer.h"
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+#include "tensor_product_point_kernels.h"
+#endif
 
 #include <deal.II/base/config.h>
 #include <deal.II/distributed/tria.h>
@@ -227,7 +230,15 @@ namespace ryujin
             const auto polynomial_space =
                 dealii::internal::FEPointEvaluation::get_polynomial_space(
                     finite_element);
-            std::vector<dealii::Point<dim>> unit_points(quadrature.size());
+
+            std::vector<dealii::Point<dim, Number>> unit_points(
+                quadrature.size());
+            /*
+             * for Number == float we need a temporary vector for the
+             * transform_points_real_to_unit_cell() function:
+             */
+            std::vector<dealii::Point<dim>> unit_points_temp(
+                std::is_same_v<Number, float> ? quadrature.size() : 0);
 
             /* Step 1: build up right hand side by iterating over children: */
 
@@ -243,8 +254,20 @@ namespace ryujin
               Assert(child_cell->is_active(), dealii::ExcInternalError());
 
               fe_values.reinit(child_cell);
-              mapping.transform_points_real_to_unit_cell(
-                  dof_cell, fe_values.get_quadrature_points(), unit_points);
+
+              if constexpr (std::is_same_v<Number, float>) {
+                mapping.transform_points_real_to_unit_cell(
+                    dof_cell,
+                    fe_values.get_quadrature_points(),
+                    unit_points_temp);
+                std::transform(std::begin(unit_points_temp),
+                               std::end(unit_points_temp),
+                               std::begin(unit_points),
+                               [](const auto &x) { return x; });
+              } else {
+                mapping.transform_points_real_to_unit_cell(
+                    dof_cell, fe_values.get_quadrature_points(), unit_points);
+              }
 
               child_cell->get_dof_indices(dof_indices);
 
@@ -257,6 +280,9 @@ namespace ryujin
                   state_values_quad[q] += U_i * fe_values.shape_value(i, q);
                 }
               }
+
+              for (unsigned int q = 0; q < quadrature.size(); ++q)
+                state_values_quad[q] *= fe_values.JxW(q);
 
               for (unsigned int q = 0; q < quadrature.size(); ++q) {
                 const unsigned int n_shapes = polynomial_space.size();
@@ -271,13 +297,13 @@ namespace ryujin
 
                 Assert(finite_element.degree == 1, dealii::ExcNotImplemented());
 
-                dealii::internal::integrate_tensor_product_value<
+                ryujin::internal::integrate_tensor_product_value<
                     /*is linear*/ true,
                     dim,
                     Number,
                     state_type>(shapes.data(),
                                 n_shapes,
-                                state_values_quad[q] * fe_values.JxW(q),
+                                state_values_quad[q],
                                 local_rhs.data(),
                                 unit_points[q],
                                 true);
@@ -456,7 +482,14 @@ namespace ryujin
             const auto polynomial_space =
                 dealii::internal::FEPointEvaluation::get_polynomial_space(
                     finite_element);
-            std::vector<dealii::Point<dim>> unit_points(quadrature.size());
+            std::vector<dealii::Point<dim, Number>> unit_points(
+                quadrature.size());
+            /*
+             * for Number == float we need a temporary vector for the
+             * transform_points_real_to_unit_cell() function:
+             */
+            std::vector<dealii::Point<dim>> unit_points_temp(
+                std::is_same_v<Number, float> ? quadrature.size() : 0);
 
             dealii::FullMatrix<double> mij(n_dofs_per_cell, n_dofs_per_cell);
             dealii::Vector<double> mi(n_dofs_per_cell);
@@ -472,8 +505,20 @@ namespace ryujin
               /* Step 1: build up right hand side on child cell: */
 
               fe_values.reinit(child_cell);
-              mapping.transform_points_real_to_unit_cell(
-                  dof_cell, fe_values.get_quadrature_points(), unit_points);
+
+              if constexpr (std::is_same_v<Number, float>) {
+                mapping.transform_points_real_to_unit_cell(
+                    dof_cell,
+                    fe_values.get_quadrature_points(),
+                    unit_points_temp);
+                std::transform(std::begin(unit_points_temp),
+                               std::end(unit_points_temp),
+                               std::begin(unit_points),
+                               [](const auto &x) { return x; });
+              } else {
+                mapping.transform_points_real_to_unit_cell(
+                    dof_cell, fe_values.get_quadrature_points(), unit_points);
+              }
 
               for (auto &it : local_rhs)
                 it = state_type{};
