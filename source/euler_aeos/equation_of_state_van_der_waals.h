@@ -51,9 +51,11 @@ namespace ryujin
         /* Update the EOS interpolation parameters on parameter read in: */
         ParameterAcceptor::parse_parameters_call_back.connect([this] {
           this->interpolation_b_ = b_;
-          /* Note that this EOS allows for negative pressures. */
-          if (b_ > 0.)
-            this->interpolation_pinfty_ = a_ / (b_ * b_);
+          /*
+           * FIXME: The van der Waals EOS allows for negative pressures. We
+           * should thus come up with a sensible way of setting
+           * "interpolation_pinfty_"...
+           */
         });
       }
 
