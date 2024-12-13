@@ -551,7 +551,7 @@ namespace ryujin
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
 
     SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_ensemble_.ensemble_communicator(),
+        mpi_ensemble_,
         /* we need write access: */ discretization_.triangulation(),
         offline_data_,
         hyperbolic_system_,
