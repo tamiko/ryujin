@@ -13,8 +13,6 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 
-#include <optional>
-
 namespace ryujin
 {
   /**

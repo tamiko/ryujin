@@ -7,6 +7,7 @@
 
 #include "scope.h"
 #include "solution_transfer.h"
+#include "state_vector.h"
 #include "time_loop.h"
 #include "version_info.h"
 
@@ -305,6 +306,15 @@ namespace ryujin
             initial_values_.interpolate_hyperbolic_vector();
       }
     }
+
+    /*
+     * In debug mode poison constrained degrees of freedom and precomputed
+     * values:
+     */
+    Vectors::debug_poison_constrained_dofs<Description>(state_vector,
+                                                        offline_data_);
+    Vectors::debug_poison_precomputed_values<Description>(state_vector,
+                                                          offline_data_);
 
     unsigned int cycle = 1;
     Number last_terminal_output = (terminal_update_interval_ == Number(0.)
