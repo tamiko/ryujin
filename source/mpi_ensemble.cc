@@ -16,11 +16,15 @@ namespace ryujin
       , n_ensembles_(1)
       , ensemble_rank_(0)
       , n_ensemble_ranks_(1)
+      , initialized_(false)
   {
   }
 
   MPIEnsemble::~MPIEnsemble()
   {
+    if (!initialized_)
+      return;
+
     MPI_Group_free(&world_group_);
     for (auto &it : ensemble_groups_)
       MPI_Group_free(&it);
@@ -34,6 +38,8 @@ namespace ryujin
   void MPIEnsemble::prepare(const int n_ensembles /* = 1 */,
                             const bool global_synchronization /* = true */)
   {
+    Assert(initialized_ == false, dealii::ExcInternalError());
+
     n_ensembles_ = n_ensembles;
     global_synchronization_ = global_synchronization;
 
@@ -113,5 +119,7 @@ namespace ryujin
               << ", e = " << n_ensemble_ranks_ << ", p = " << n_peer_ranks
               << ") -> belongig to ensemble: " << ensemble_ << std::endl;
 #endif
+
+    initialized_ = true;
   }
 } /* namespace ryujin */
