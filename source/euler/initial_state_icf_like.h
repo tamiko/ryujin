@@ -141,10 +141,18 @@ namespace ryujin
         }
 
         /* Define perturbation */
-        const double angle = std::acos(std::abs(point[dim - 1]) / point.norm());
+        const auto x = point[0];
+        const auto y = dim > 1 ? point[1] : 0.;
+
+        const double theta = std::atan2(y, x);
+
+        double phi = 0.;
+        if constexpr (dim == 3)
+          phi = std::atan2(point[2], std::sqrt(x * x + y * y));
 
         const auto omega = num_modes_;
-        const double perturbation = amplitude_ * std::cos(omega * angle);
+        const double perturbation =
+            amplitude_ * std::cos(omega * theta) * std::cos(omega * phi);
 
         auto full_state =
             (point.norm() > interface_radius_ + perturbation ? state_outside_
