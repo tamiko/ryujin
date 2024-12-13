@@ -947,7 +947,7 @@ namespace ryujin
             const unsigned int *js = sparsity_simd.columns(i) + stride_size;
             for (unsigned int col_idx = 1; col_idx < row_length;
                  ++col_idx, js += stride_size) {
-              bounds = Limiter::combine_bounds(
+              bounds = limiter.combine_bounds(
                   bounds,
                   bounds_.template get_tensor<T, std::array<T, n_bounds>>(js));
             }
