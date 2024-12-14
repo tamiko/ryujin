@@ -140,7 +140,7 @@ namespace ryujin
               view.from_initial_state(primitive_shock_state);
         }
 
-        /* Define perturbation */
+        /* Compute polar (and potentially azimuthal) angle */
         const auto x = point[0];
         const auto y = dim > 1 ? point[1] : 0.;
 
@@ -150,10 +150,12 @@ namespace ryujin
         if constexpr (dim == 3)
           phi = std::atan2(point[2], std::sqrt(x * x + y * y));
 
+        /* Compute perturbation for interface */
         const auto omega = num_modes_;
         const double perturbation =
             amplitude_ * std::cos(omega * theta) * std::cos(omega * phi);
 
+        /* Compute state depending on location */
         auto full_state =
             (point.norm() > interface_radius_ + perturbation ? state_outside_
                                                              : state_inside_);
