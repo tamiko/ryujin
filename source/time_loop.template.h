@@ -348,8 +348,6 @@ namespace ryujin
       /* Perform various tasks whenever we reach a timer tick: */
 
       if (t >= relax * timer_cycle * timer_granularity_) {
-        output(state_vector, base_name_ensemble_ + "-solution", t, timer_cycle);
-
         if (enable_compute_error_) {
           StateVector analytic;
           {
@@ -364,11 +362,19 @@ namespace ryujin
             std::get<0>(analytic) =
                 initial_values_.interpolate_hyperbolic_vector(t);
           }
+
+          /*
+           * FIXME: a call to output() will also write a checkpoint (if
+           * enabled). So as a workaround we simply call the output()
+           * function for the analytic solution first...
+           */
           output(analytic,
                  base_name_ensemble_ + "-analytic_solution",
                  t,
                  timer_cycle);
         }
+
+        output(state_vector, base_name_ensemble_ + "-solution", t, timer_cycle);
 
         if (enable_compute_quantities_ &&
             (timer_cycle % timer_compute_quantities_multiplier_ == 0)) {
