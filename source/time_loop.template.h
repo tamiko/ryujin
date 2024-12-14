@@ -7,6 +7,7 @@
 
 #include "scope.h"
 #include "solution_transfer.h"
+#include "state_vector.h"
 #include "time_loop.h"
 #include "version_info.h"
 
@@ -306,6 +307,15 @@ namespace ryujin
       }
     }
 
+    /*
+     * In debug mode poison constrained degrees of freedom and precomputed
+     * values:
+     */
+    Vectors::debug_poison_constrained_dofs<Description>(state_vector,
+                                                        offline_data_);
+    Vectors::debug_poison_precomputed_values<Description>(state_vector,
+                                                          offline_data_);
+
     unsigned int cycle = 1;
     Number last_terminal_output = (terminal_update_interval_ == Number(0.)
                                        ? std::numeric_limits<Number>::max()
@@ -338,8 +348,6 @@ namespace ryujin
       /* Perform various tasks whenever we reach a timer tick: */
 
       if (t >= relax * timer_cycle * timer_granularity_) {
-        output(state_vector, base_name_ensemble_ + "-solution", t, timer_cycle);
-
         if (enable_compute_error_) {
           StateVector analytic;
           {
@@ -354,11 +362,19 @@ namespace ryujin
             std::get<0>(analytic) =
                 initial_values_.interpolate_hyperbolic_vector(t);
           }
+
+          /*
+           * FIXME: a call to output() will also write a checkpoint (if
+           * enabled). So as a workaround we simply call the output()
+           * function for the analytic solution first...
+           */
           output(analytic,
                  base_name_ensemble_ + "-analytic_solution",
                  t,
                  timer_cycle);
         }
+
+        output(state_vector, base_name_ensemble_ + "-solution", t, timer_cycle);
 
         if (enable_compute_quantities_ &&
             (timer_cycle % timer_compute_quantities_multiplier_ == 0)) {
@@ -541,7 +557,7 @@ namespace ryujin
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
 
     SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_ensemble_.ensemble_communicator(),
+        mpi_ensemble_,
         /* we need write access: */ discretization_.triangulation(),
         offline_data_,
         hyperbolic_system_,

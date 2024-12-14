@@ -135,6 +135,8 @@ namespace ryujin
     int ensemble_rank_;
     int n_ensemble_ranks_;
 
+    bool initialized_;
+
     MPI_Group world_group_;
     std::vector<MPI_Group> ensemble_groups_;
     MPI_Group ensemble_leader_group_;
