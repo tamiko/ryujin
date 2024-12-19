@@ -11,10 +11,6 @@ namespace ryujin
 {
   using namespace dealii;
 
-
-  /**
-   * TODO: clear out precomputed vector and also scale add V.
-   */
   template <typename StateVector, typename Number>
   void
   sadd(StateVector &dst, const Number s, const Number b, const StateVector &src)
@@ -22,6 +18,10 @@ namespace ryujin
     auto &dst_U = std::get<0>(dst);
     auto &src_U = std::get<0>(src);
     dst_U.sadd(s, b, src_U);
+
+    auto &dst_V = std::get<2>(dst);
+    auto &src_V = std::get<2>(src);
+    dst_V.sadd(s, b, src_V);
   }
 
 
