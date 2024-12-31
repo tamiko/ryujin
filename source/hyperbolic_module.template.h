@@ -1191,6 +1191,13 @@ namespace ryujin
     CALLGRIND_STOP_INSTRUMENTATION;
 
     /*
+     * Pass through the parabolic state vector
+     */
+    const auto &old_V = std::get<2>(old_state_vector);
+    auto &new_V = std::get<2>(new_state_vector);
+    new_V = old_V;
+
+    /*
      * Do we have to restart?
      */
 
