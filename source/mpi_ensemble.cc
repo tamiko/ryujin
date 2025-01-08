@@ -7,7 +7,9 @@
 
 namespace ryujin
 {
-  MPIEnsemble::MPIEnsemble(const MPI_Comm &mpi_communicator)
+  MPIEnsemble::MPIEnsemble(const MPI_Comm &mpi_communicator,
+                           const int n_ensembles /* = 1 */,
+                           const bool global_synchronization /* = true */)
       : world_communicator_(mpi_communicator)
       , global_synchronization_(true)
       , world_rank_(0)
@@ -16,29 +18,10 @@ namespace ryujin
       , n_ensembles_(1)
       , ensemble_rank_(0)
       , n_ensemble_ranks_(1)
-      , initialized_(false)
   {
-  }
-
-  MPIEnsemble::~MPIEnsemble()
-  {
-    if (!initialized_)
-      return;
-
-    MPI_Group_free(&world_group_);
-    for (auto &it : ensemble_groups_)
-      MPI_Group_free(&it);
-    MPI_Group_free(&ensemble_leader_group_);
-
-    MPI_Comm_free(&ensemble_communicator_);
-    MPI_Comm_free(&ensemble_leader_communicator_);
-    MPI_Comm_free(&peer_communicator_);
-  }
-
-  void MPIEnsemble::prepare(const int n_ensembles /* = 1 */,
-                            const bool global_synchronization /* = true */)
-  {
-    Assert(initialized_ == false, dealii::ExcInternalError());
+#ifdef DEBUG_OUTPUT
+    std::cout << "MPIEnsemble::prepare()" << std::endl;
+#endif
 
     n_ensembles_ = n_ensembles;
     global_synchronization_ = global_synchronization;
@@ -119,7 +102,18 @@ namespace ryujin
               << ", e = " << n_ensemble_ranks_ << ", p = " << n_peer_ranks
               << ") -> belongig to ensemble: " << ensemble_ << std::endl;
 #endif
-
-    initialized_ = true;
   }
+
+  MPIEnsemble::~MPIEnsemble()
+  {
+    MPI_Group_free(&world_group_);
+    for (auto &it : ensemble_groups_)
+      MPI_Group_free(&it);
+    MPI_Group_free(&ensemble_leader_group_);
+
+    MPI_Comm_free(&ensemble_communicator_);
+    MPI_Comm_free(&ensemble_leader_communicator_);
+    MPI_Comm_free(&peer_communicator_);
+  }
+
 } /* namespace ryujin */

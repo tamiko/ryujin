@@ -29,10 +29,10 @@ namespace ryujin
   TimeLoop<Description, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_ensemble_(mpi_comm)
-      , discretization_(mpi_ensemble_, "/C - Discretization")
-      , offline_data_(mpi_ensemble_, discretization_, "/D - OfflineData")
       , hyperbolic_system_(mpi_ensemble_, "/B - Equation")
       , parabolic_system_(mpi_ensemble_, "/B - Equation")
+      , discretization_(mpi_ensemble_, "/C - Discretization")
+      , offline_data_(mpi_ensemble_, discretization_, "/D - OfflineData")
       , initial_values_(mpi_ensemble_,
                         "/E - InitialValues",
                         mpi_ensemble_,
@@ -229,8 +229,6 @@ namespace ryujin
 #endif
 
     {
-      mpi_ensemble_.prepare();
-
       base_name_ensemble_ = base_name_;
       if (mpi_ensemble_.n_ensembles() > 1) {
         print_info("setting up MPI ensemble");

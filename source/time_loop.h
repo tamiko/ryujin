@@ -193,10 +193,10 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer_;
 
-    Discretization<dim> discretization_;
-    OfflineData<dim, Number> offline_data_;
     MPIEnsembleContainer<HyperbolicSystem> hyperbolic_system_;
     MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
+    Discretization<dim> discretization_;
+    OfflineData<dim, Number> offline_data_;
     MPIEnsembleContainer<InitialValues<Description, dim, Number>>
         initial_values_;
     HyperbolicModule<Description, dim, Number> hyperbolic_module_;
