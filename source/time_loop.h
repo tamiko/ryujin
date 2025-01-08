@@ -12,6 +12,7 @@
 #include "initial_values.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
+#include "mpi_ensemble_container.h"
 #include "offline_data.h"
 #include "parabolic_module.h"
 #include "postprocessor.h"
@@ -26,7 +27,6 @@
 
 namespace ryujin
 {
-
   /**
    * The high-level time loop driving the computation.
    *
@@ -195,9 +195,10 @@ namespace ryujin
 
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
-    HyperbolicSystem hyperbolic_system_;
-    ParabolicSystem parabolic_system_;
-    InitialValues<Description, dim, Number> initial_values_;
+    MPIEnsembleContainer<HyperbolicSystem> hyperbolic_system_;
+    MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
+    MPIEnsembleContainer<InitialValues<Description, dim, Number>>
+        initial_values_;
     HyperbolicModule<Description, dim, Number> hyperbolic_module_;
     ParabolicModule<Description, dim, Number> parabolic_module_;
     TimeIntegrator<Description, dim, Number> time_integrator_;
