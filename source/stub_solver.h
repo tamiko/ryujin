@@ -5,11 +5,8 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include "mpi_ensemble.h"
-#include "parabolic_system.h"
-
 #include <initial_values.h>
+#include <mpi_ensemble.h>
 #include <offline_data.h>
 
 #include <deal.II/base/parameter_acceptor.h>

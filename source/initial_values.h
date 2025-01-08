@@ -44,6 +44,8 @@ namespace ryujin
     //@{
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
+    using ParabolicSystem = typename Description::ParabolicSystem;
+
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
@@ -70,6 +72,7 @@ namespace ryujin
      * Constructor.
      */
     InitialValues(const HyperbolicSystem &hyperbolic_system,
+                  const ParabolicSystem &parabolic_system,
                   const OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "/InitialValues");
 
@@ -146,6 +149,7 @@ namespace ryujin
     //@{
 
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
     typename InitialStateLibrary<Description, dim, Number>::
