@@ -28,10 +28,6 @@ namespace ryujin
   class MPIEnsemble final
   {
   public:
-    MPIEnsemble(const MPI_Comm &mpi_communicator);
-
-    ~MPIEnsemble();
-
     /**
      * Prepare the MPI ensemble and split the gobal MPI communicator into
      * @p n_ensembles different subranges of comparable size. The boolean
@@ -43,8 +39,11 @@ namespace ryujin
      * @pre The total number of mpi ranks must be an integer multiple of
      * n_ensembles.
      */
-    void prepare(const int n_ensembles = 1,
-                 const bool global_synchronization = true);
+    MPIEnsemble(const MPI_Comm &mpi_communicator,
+                const int n_ensembles = 1,
+                const bool global_synchronization = true);
+
+    ~MPIEnsemble();
 
     /**
      * Return the world communicator.
@@ -134,8 +133,6 @@ namespace ryujin
     int n_ensembles_;
     int ensemble_rank_;
     int n_ensemble_ranks_;
-
-    bool initialized_;
 
     MPI_Group world_group_;
     std::vector<MPI_Group> ensemble_groups_;

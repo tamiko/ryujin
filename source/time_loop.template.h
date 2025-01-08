@@ -29,14 +29,16 @@ namespace ryujin
   TimeLoop<Description, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_ensemble_(mpi_comm)
-      , hyperbolic_system_("/B - Equation")
-      , parabolic_system_("/B - Equation")
+      , hyperbolic_system_(mpi_ensemble_, "/B - Equation")
+      , parabolic_system_(mpi_ensemble_, "/B - Equation")
       , discretization_(mpi_ensemble_, "/C - Discretization")
       , offline_data_(mpi_ensemble_, discretization_, "/D - OfflineData")
-      , initial_values_(hyperbolic_system_,
-                        parabolic_system_,
+      , initial_values_(mpi_ensemble_,
+                        "/E - InitialValues",
+                        mpi_ensemble_,
                         offline_data_,
-                        "/E - InitialValues")
+                        hyperbolic_system_,
+                        parabolic_system_)
       , hyperbolic_module_(mpi_ensemble_,
                            computing_timer_,
                            offline_data_,
@@ -227,8 +229,6 @@ namespace ryujin
 #endif
 
     {
-      mpi_ensemble_.prepare();
-
       base_name_ensemble_ = base_name_;
       if (mpi_ensemble_.n_ensembles() > 1) {
         print_info("setting up MPI ensemble");
@@ -258,7 +258,7 @@ namespace ryujin
       print_info("preparing compute kernels");
 
       unsigned int n_parabolic_state_vectors =
-          parabolic_system_.n_parabolic_state_vectors();
+          parabolic_system_.get().n_parabolic_state_vectors();
 
       offline_data_.prepare(
           problem_dimension, n_precomputed_values, n_parabolic_state_vectors);
@@ -306,7 +306,7 @@ namespace ryujin
 
         Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         std::get<0>(state_vector) =
-            initial_values_.interpolate_hyperbolic_vector();
+            initial_values_.get().interpolate_hyperbolic_vector();
       }
     }
 
@@ -363,7 +363,7 @@ namespace ryujin
                         "time step [X]   - interpolate analytic solution");
             Vectors::reinit_state_vector<Description>(analytic, offline_data_);
             std::get<0>(analytic) =
-                initial_values_.interpolate_hyperbolic_vector(t);
+                initial_values_.get().interpolate_hyperbolic_vector(t);
           }
 
           /*
@@ -701,7 +701,8 @@ namespace ryujin
     Number l1_norm = 0;
     Number l2_norm = 0;
 
-    const auto analytic_U = initial_values_.interpolate_hyperbolic_vector(t);
+    const auto analytic_U =
+        initial_values_.get().interpolate_hyperbolic_vector(t);
     const auto &U = std::get<0>(state_vector);
 
     ScalarVector analytic_component;
@@ -1368,9 +1369,9 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: (HYP) " << hyperbolic_system_.problem_name;
+    output << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
     if constexpr (!ParabolicSystem::is_identity) {
-      output << "\n             (PAR) " << parabolic_system_.problem_name;
+      output << "\n             (PAR) " << parabolic_system_.get().problem_name;
     }
     output << "\n             [" << base_name_ << "] ";
     if (mpi_ensemble_.n_ensembles() > 1) {
