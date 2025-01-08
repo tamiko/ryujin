@@ -33,7 +33,10 @@ namespace ryujin
       , parabolic_system_("/B - Equation")
       , discretization_(mpi_ensemble_, "/C - Discretization")
       , offline_data_(mpi_ensemble_, discretization_, "/D - OfflineData")
-      , initial_values_(hyperbolic_system_, offline_data_, "/E - InitialValues")
+      , initial_values_(hyperbolic_system_,
+                        parabolic_system_,
+                        offline_data_,
+                        "/E - InitialValues")
       , hyperbolic_module_(mpi_ensemble_,
                            computing_timer_,
                            offline_data_,
