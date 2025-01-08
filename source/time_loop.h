@@ -193,10 +193,10 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer_;
 
-    HyperbolicSystem hyperbolic_system_;
-    ParabolicSystem parabolic_system_;
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
+    HyperbolicSystem hyperbolic_system_;
+    ParabolicSystem parabolic_system_;
     InitialValues<Description, dim, Number> initial_values_;
     HyperbolicModule<Description, dim, Number> hyperbolic_module_;
     ParabolicModule<Description, dim, Number> parabolic_module_;

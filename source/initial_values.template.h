@@ -18,14 +18,16 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   InitialValues<Description, dim, Number>::InitialValues(
+      const MPIEnsemble &mpi_ensemble,
+      const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
-      const OfflineData<dim, Number> &offline_data,
       const std::string &subsection)
       : ParameterAcceptor(subsection)
+      , mpi_ensemble_(mpi_ensemble)
+      , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
-      , offline_data_(&offline_data)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
         &InitialValues<Description, dim, Number>::parse_parameters_callback,
