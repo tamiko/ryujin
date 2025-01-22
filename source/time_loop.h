@@ -17,6 +17,7 @@
 #include "parabolic_module.h"
 #include "postprocessor.h"
 #include "quantities.h"
+#include "solution_transfer.h"
 #include "time_integrator.h"
 #include "vtu_output.h"
 
@@ -203,6 +204,7 @@ namespace ryujin
     ParabolicModule<Description, dim, Number> parabolic_module_;
     TimeIntegrator<Description, dim, Number> time_integrator_;
     MeshAdaptor<Description, dim, Number> mesh_adaptor_;
+    SolutionTransfer<Description, dim, Number> solution_transfer_;
     Postprocessor<Description, dim, Number> postprocessor_;
     VTUOutput<Description, dim, Number> vtu_output_;
     Quantities<Description, dim, Number> quantities_;

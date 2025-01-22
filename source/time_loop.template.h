@@ -6,14 +6,12 @@
 #pragma once
 
 #include "scope.h"
-#include "solution_transfer.h"
 #include "state_vector.h"
 #include "time_loop.h"
 #include "version_info.h"
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/work_stream.h>
-#include <deal.II/distributed/solution_transfer.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
 
@@ -64,6 +62,8 @@ namespace ryujin
                       hyperbolic_module_.initial_precomputed(),
                       hyperbolic_module_.alpha(),
                       "/I - MeshAdaptor")
+      , solution_transfer_(
+            mpi_ensemble_, offline_data_, hyperbolic_system_, parabolic_system_)
       , postprocessor_(mpi_ensemble_,
                        offline_data_,
                        hyperbolic_system_,
@@ -553,21 +553,13 @@ namespace ryujin
                      mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
 
-    /*
-     * Now read in the state vector:
-     */
+    /* Now read in the state vector: */
 
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
 
-    SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_ensemble_,
-        /* we need write access: */ discretization_.triangulation(),
-        offline_data_,
-        hyperbolic_system_,
-        parabolic_system_);
-
-    solution_transfer.set_handle(transfer_handle);
-    solution_transfer.project(state_vector);
+    solution_transfer_.set_handle(transfer_handle);
+    solution_transfer_.project(state_vector);
+    solution_transfer_.reset_handle();
   }
 
 
@@ -587,20 +579,10 @@ namespace ryujin
                     "write_checkpoint() is not implemented for "
                     "distributed::shared::Triangulation which we use in 1D"));
 
-    /*
-     * Create SolutionTransfer object, attach state vector and write out:
-     */
-
-    SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_ensemble_,
-        /* we need write access: */ discretization_.triangulation(),
-        offline_data_,
-        hyperbolic_system_,
-        parabolic_system_);
-
-    /* need hyperbolic_module.prepare_state_vector() prior to this call: */
-    solution_transfer.prepare_projection(state_vector);
-    const auto transfer_handle = solution_transfer.get_handle();
+    /* We need hyperbolic_module.prepare_state_vector() prior to this call! */
+    solution_transfer_.prepare_projection(state_vector);
+    const auto transfer_handle = solution_transfer_.get_handle();
+    solution_transfer_.reset_handle();
 
     std::string name = base_name + "-checkpoint";
 
@@ -657,29 +639,17 @@ namespace ryujin
 
     triangulation.prepare_coarsening_and_refinement();
 
-    /*
-     * Set up SolutionTransfer:
-     */
+    /* We need hyperbolic_module.prepare_state_vector() prior to this call! */
+    solution_transfer_.prepare_projection(state_vector);
 
-    SolutionTransfer<Description, dim, Number> solution_transfer(
-        mpi_ensemble_,
-        /* we need write access: */ discretization_.triangulation(),
-        offline_data_,
-        hyperbolic_system_,
-        parabolic_system_);
-
-    /* need hyperbolic_module.prepare_state_vector() prior to this call: */
-    solution_transfer.prepare_projection(state_vector);
-
-    /*
-     * Execute mesh adaptation and project old state to new state vector:
-     */
+    /* Execute mesh adaptation and project old state to new state vector: */
 
     triangulation.execute_coarsening_and_refinement();
     prepare_compute_kernels();
 
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
-    solution_transfer.project(state_vector);
+    solution_transfer_.project(state_vector);
+    solution_transfer_.reset_handle();
   }
 
 

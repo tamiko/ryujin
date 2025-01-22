@@ -59,7 +59,6 @@ namespace ryujin
      * Constructor
      */
     SolutionTransfer(const MPIEnsemble &mpi_ensemble,
-                     typename Discretization<dim>::Triangulation &triangulation,
                      const OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
                      const ParabolicSystem &parabolic_system);
@@ -88,15 +87,14 @@ namespace ryujin
      * Return the handle associated with the call back that was set by
      * prepare_projection() and the associated data attached to the
      * triangulation.
-     *
-     * @pre Can only be called after a call to prepare_projection().
      */
     unsigned int get_handle() const
     {
-      Assert(handle_ != dealii::numbers::invalid_unsigned_int,
-             dealii::ExcMessage("Invalid handle: Cannot retrieve a valid "
-                                "handle because get_handle() can only be "
-                                "called after a call to prepare_projection()"));
+      Assert(
+          handle_ != dealii::numbers::invalid_unsigned_int,
+          dealii::ExcMessage("Invalid handle: Cannot retrieve a valid "
+                             "handle. get_handle() can only be called after a "
+                             "call to prepare_projection(), or set_handle()."));
       return handle_;
     }
 
@@ -104,16 +102,25 @@ namespace ryujin
      * Set the handle associated data attached to the triangulation. This
      * function has to be called after a Triangulation::load() operation
      * and prior to the SolutionTransfer::project().
-     *
-     * @pre Cannot be called after a call to prepare_projection().
      */
     void set_handle(unsigned int handle)
     {
-      Assert(handle_ == dealii::numbers::invalid_unsigned_int,
-             dealii::ExcMessage(
-                 "Invalid state: Cannot set handle because we already have a "
-                 "valid handle due to a prior call to prepare_projection()."));
+      Assert(
+          handle_ == dealii::numbers::invalid_unsigned_int,
+          dealii::ExcMessage("Invalid state: Cannot set handle because we "
+                             "already have a valid handle due to a prior call "
+                             "to prepare_projection(), or set_handle()."));
       handle_ = handle;
+    }
+
+    /**
+     * Return the handle associated with the call back that was set by
+     * prepare_projection() and the associated data attached to the
+     * triangulation.
+     */
+    void reset_handle()
+    {
+      handle_ = dealii::numbers::invalid_unsigned_int;
     }
 
     /**
@@ -139,8 +146,6 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::SmartPointer<typename Discretization<dim>::Triangulation>
-        triangulation_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
