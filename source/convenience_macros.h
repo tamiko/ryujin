@@ -151,18 +151,16 @@ namespace
   template <typename T, typename>
   auto dereference(T &t) -> decltype(dereference(*t)) &;
 
-  template <
-      typename T,
-      typename = typename std::enable_if<!is_dereferenceable<T>::value>::type>
+  template <typename T>
   auto dereference(T &t) -> T &
+    requires(!is_dereferenceable<T>::value)
   {
     return t;
   }
 
-  template <
-      typename T,
-      typename = typename std::enable_if<is_dereferenceable<T>::value>::type>
+  template <typename T>
   auto dereference(T &t) -> decltype(*t) &
+    requires is_dereferenceable<T>::value
   {
     return *t;
   }
@@ -184,7 +182,7 @@ namespace
  * @ingroup Miscellaneous
  */
 #define ACCESSOR_READ_ONLY(member)                                             \
-  inline auto &member() const                                                  \
+  inline const auto &member() const                                            \
   {                                                                            \
     return dereference(member##_);                                             \
   }
