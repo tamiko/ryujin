@@ -38,22 +38,16 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   SolutionTransfer<Description, dim, Number>::SolutionTransfer(
       const MPIEnsemble &mpi_ensemble,
-      typename Discretization<dim>::Triangulation &triangulation,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system)
       : mpi_ensemble_(mpi_ensemble)
-      , triangulation_(&triangulation)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , handle_(dealii::numbers::invalid_unsigned_int)
 
   {
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
   }
 
 
@@ -150,11 +144,7 @@ namespace ryujin
                     "distributed::shared::Triangulation which we use in 1D"));
 
     const auto &discretization = offline_data_->discretization();
-    const auto &triangulation [[maybe_unused]] = discretization.triangulation();
-    Assert(triangulation_ == &triangulation,
-           dealii::ExcMessage(
-               "The attached triangulation object must be the same object that "
-               "is stored in Discretization/OfflineData"));
+    auto &triangulation = *discretization.triangulation_; /* writable */
 
     Assert(handle_ == dealii::numbers::invalid_unsigned_int,
            dealii::ExcMessage(
@@ -164,7 +154,7 @@ namespace ryujin
      * Add a register_data_attach callback that
      */
 
-    handle_ = triangulation_->register_data_attach(
+    handle_ = triangulation.register_data_attach(
         [this, &old_state_vector](const auto cell,
                                   const dealii::CellStatus status) {
           const auto &dof_handler = offline_data_->dof_handler();
@@ -373,12 +363,9 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto &affine_constraints = offline_data_->affine_constraints();
+
     const auto &discretization = offline_data_->discretization();
-    const auto &triangulation [[maybe_unused]] = discretization.triangulation();
-    Assert(triangulation_ == &triangulation,
-           dealii::ExcMessage(
-               "The attached triangulation object must be the same object that "
-               "is stored in Discretization/OfflineData"));
+    auto &triangulation = *discretization.triangulation_; /* writable */
 
     Assert(
         handle_ != dealii::numbers::invalid_unsigned_int,
@@ -395,7 +382,7 @@ namespace ryujin
     HyperbolicVector projected_state;
     projected_state.reinit(offline_data_->hyperbolic_vector_partitioner());
 
-    triangulation_->notify_ready_to_unpack( //
+    triangulation.notify_ready_to_unpack( //
         handle_,
         [this, &projected_mass, &projected_state](
             const auto &cell,
