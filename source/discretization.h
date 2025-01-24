@@ -240,6 +240,7 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(ansatz)
 
+  public:
     /**
      * Return a boolean indicating  whether the chosen Ansatz space is
      * discontinuous.
@@ -247,7 +248,7 @@ namespace ryujin
     bool have_discontinuous_ansatz() const
     {
       switch (ansatz_) {
-        /* Continous Ansatz: */
+        /* Continuous Ansatz: */
       case Ansatz::cg_q1:
         [[fallthrough]];
       case Ansatz::cg_q2:
@@ -263,8 +264,9 @@ namespace ryujin
       case Ansatz::dg_q3:
         return true;
       }
-      __builtin_unreachable();
-      return false;
+
+      AssertThrow(false, dealii::ExcInternalError());
+      __builtin_trap();
     }
 
     /**
@@ -293,6 +295,14 @@ namespace ryujin
     ACCESSOR_READ_ONLY(finite_element)
 
     /**
+     * Return a read-only const reference to a continuous ("cG") variant of
+     * the selected discontinuous finite element space.
+     *
+     * @note This object is unavailable for the dG Q0 discretization.
+     */
+    ACCESSOR_READ_ONLY(finite_element_cg)
+
+    /**
      * Return a read-only const reference to the quadrature rule.
      */
     ACCESSOR_READ_ONLY(quadrature)
@@ -309,7 +319,7 @@ namespace ryujin
 
     /**
      * Return a read-only const reference to the nodal face quadrature rule
-     * (GaußLobatto).
+     * (Gauß-Lobatto).
      */
     ACCESSOR_READ_ONLY(face_nodal_quadrature)
 
@@ -319,6 +329,7 @@ namespace ryujin
     std::unique_ptr<Triangulation> triangulation_;
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
+    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_cg_;
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
     std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
     std::unique_ptr<const dealii::Quadrature<dim - 1>> face_quadrature_;

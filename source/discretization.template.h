@@ -128,21 +128,27 @@ namespace ryujin
     switch (ansatz_) {
     case Ansatz::cg_q1:
       finite_element_ = std::make_unique<FE_Q<dim>>(1);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(1);
       break;
     case Ansatz::cg_q2:
       finite_element_ = std::make_unique<FE_Q<dim>>(2);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(2);
       break;
     case Ansatz::cg_q3:
       finite_element_ = std::make_unique<FE_Q<dim>>(3);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(3);
       break;
     case Ansatz::dg_q1:
       finite_element_ = std::make_unique<FE_DGQ<dim>>(1);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(1);
       break;
     case Ansatz::dg_q2:
       finite_element_ = std::make_unique<FE_DGQ<dim>>(2);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(2);
       break;
     case Ansatz::dg_q3:
       finite_element_ = std::make_unique<FE_DGQ<dim>>(3);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(3);
       break;
     }
 
