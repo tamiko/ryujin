@@ -123,8 +123,8 @@ namespace ryujin
        * Given a state @p U_i and an index @p i return "strict" bounds,
        * i.e., a minimal convex set containing the state.
        */
-      Bounds bounds_from_state(const unsigned int i,
-                               const state_type &U_i) const;
+      Bounds projection_bounds_from_state(const unsigned int i,
+                                          const state_type &U_i) const;
 
       /**
        * Given two bounds bounds_left, bounds_right, this function computes
@@ -223,7 +223,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto Limiter<dim, Number>::bounds_from_state(
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::projection_bounds_from_state(
         const unsigned int /*i*/, const state_type &U_i) const -> Bounds
     {
       const auto view = hyperbolic_system.view<dim, Number>();
