@@ -308,6 +308,12 @@ namespace ryujin
     ACCESSOR_READ_ONLY(quadrature)
 
     /**
+     * Return a read-only const reference to the nodal quadrature rule
+     * (Gauß Lobatto).
+     */
+    ACCESSOR_READ_ONLY(nodal_quadrature)
+
+    /**
      * Return a read-only const reference to the 1D quadrature rule.
      */
     ACCESSOR_READ_ONLY(quadrature_1d)
@@ -319,7 +325,7 @@ namespace ryujin
 
     /**
      * Return a read-only const reference to the nodal face quadrature rule
-     * (Gauß-Lobatto).
+     * (Gauß Lobatto).
      */
     ACCESSOR_READ_ONLY(face_nodal_quadrature)
 
@@ -331,6 +337,7 @@ namespace ryujin
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_cg_;
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+    std::unique_ptr<const dealii::Quadrature<dim>> nodal_quadrature_;
     std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
     std::unique_ptr<const dealii::Quadrature<dim - 1>> face_quadrature_;
     std::unique_ptr<const dealii::Quadrature<dim - 1>> face_nodal_quadrature_;

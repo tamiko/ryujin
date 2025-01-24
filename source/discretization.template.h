@@ -158,6 +158,7 @@ namespace ryujin
     case Ansatz::dg_q1:
       mapping_ = std::make_unique<MappingQ<dim>>(1);
       quadrature_ = std::make_unique<QGauss<dim>>(2);
+      nodal_quadrature_ = std::make_unique<dealii::QGaussLobatto<dim>>(2);
       quadrature_1d_ = std::make_unique<QGauss<1>>(2);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(2);
       face_nodal_quadrature_ =
@@ -168,6 +169,7 @@ namespace ryujin
     case Ansatz::dg_q2:
       mapping_ = std::make_unique<MappingQ<dim>>(2);
       quadrature_ = std::make_unique<QGauss<dim>>(3);
+      nodal_quadrature_ = std::make_unique<dealii::QGaussLobatto<dim>>(3);
       quadrature_1d_ = std::make_unique<QGauss<1>>(3);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(3);
       face_nodal_quadrature_ =
@@ -178,6 +180,7 @@ namespace ryujin
     case Ansatz::dg_q3:
       mapping_ = std::make_unique<MappingQ<dim>>(3);
       quadrature_ = std::make_unique<QGauss<dim>>(4);
+      nodal_quadrature_ = std::make_unique<dealii::QGaussLobatto<dim>>(4);
       quadrature_1d_ = std::make_unique<QGauss<1>>(4);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(4);
       face_nodal_quadrature_ =
