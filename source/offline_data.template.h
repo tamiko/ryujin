@@ -85,7 +85,7 @@ namespace ryujin
 
     /*
      * Enforce periodic boundary conditions. We assume that the mesh is in
-     * "normal configuration".
+     * "normal configuration."
      */
 
     const auto &periodic_faces =
@@ -278,7 +278,7 @@ namespace ryujin
     };
 
     /*
-     * A small lambda that performs a logical or over all MPI ranks:
+     * A small lambda that performs a "logical or" over all MPI ranks:
      */
     const auto mpi_allreduce_logical_or = [&](const bool local_value) {
       std::function<bool(const bool &, const bool &)> comparator =
@@ -366,7 +366,7 @@ namespace ryujin
         scalar_partitioner_, n_precomputed_values);
 
     /*
-     * After elminiating periodicity and hanging node constraints we need
+     * After eliminiating periodicity and hanging node constraints we need
      * to update n_export_indices_ again. This happens because we need to
      * call export_indices_first() with incomplete information (missing
      * eliminated degrees of freedom).
@@ -404,9 +404,18 @@ namespace ryujin
 
     sparsity_pattern_simd_.reinit(
         n_locally_internal_, sparsity_pattern_, scalar_partitioner_);
+  }
+
+
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::create_matrices()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<dim, Number>::create_matrices()" << std::endl;
+#endif
 
     /*
-     * Next we can (re)initialize all local matrices:
+     * First, (re)initialize all local matrices:
      */
 
     mass_matrix_.reinit(sparsity_pattern_simd_);
@@ -419,15 +428,10 @@ namespace ryujin
     cij_matrix_.reinit(sparsity_pattern_simd_);
     if (discretization_->have_discontinuous_ansatz())
       incidence_matrix_.reinit(sparsity_pattern_simd_);
-  }
 
-
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::assemble()
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::assemble()" << std::endl;
-#endif
+    /*
+     * Then, assemble:
+     */
 
     auto &dof_handler = *dof_handler_;
 
@@ -913,7 +917,7 @@ namespace ryujin
 
                   Number r_ij = 1.0;
 
-                  if (ansatz == Ansatz::dg_q0 || ansatz == Ansatz::dg_q2) {
+                  if (ansatz == Ansatz::dg_q2) {
                     /*
                      * For even polynomial degree we normalize the incidence
                      * matrix to (0.5 (m_i + m_j) / |Omega|) ^ (1.5 / d).

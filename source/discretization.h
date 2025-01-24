@@ -142,9 +142,6 @@ namespace ryujin
     /** cG Q3: continuous bi- (tri-) cubic Lagrange elements */
     cg_q3,
 
-    /** dG Q0: discontinuous piecewise constant elements */
-    dg_q0,
-
     /** dG Q1: discontinuous bi- (tri-) linear Lagrange elements */
     dg_q1,
 
@@ -171,7 +168,6 @@ DECLARE_ENUM(ryujin::Ansatz,
              LIST({ryujin::Ansatz::cg_q1, "cG Q1"},
                   {ryujin::Ansatz::cg_q2, "cG Q2"},
                   {ryujin::Ansatz::cg_q3, "cG Q3"},
-                  {ryujin::Ansatz::dg_q0, "dG Q0"},
                   {ryujin::Ansatz::dg_q1, "dG Q1"},
                   {ryujin::Ansatz::dg_q2, "dG Q2"},
                   {ryujin::Ansatz::dg_q3, "dG Q3"}));
@@ -244,6 +240,7 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(ansatz)
 
+  public:
     /**
      * Return a boolean indicating  whether the chosen Ansatz space is
      * discontinuous.
@@ -251,7 +248,7 @@ namespace ryujin
     bool have_discontinuous_ansatz() const
     {
       switch (ansatz_) {
-        /* Continous Ansatz: */
+        /* Continuous Ansatz: */
       case Ansatz::cg_q1:
         [[fallthrough]];
       case Ansatz::cg_q2:
@@ -260,8 +257,6 @@ namespace ryujin
         return false;
 
         /* Discontinuous Ansatz: */
-      case Ansatz::dg_q0:
-        [[fallthrough]];
       case Ansatz::dg_q1:
         [[fallthrough]];
       case Ansatz::dg_q2:
@@ -269,8 +264,9 @@ namespace ryujin
       case Ansatz::dg_q3:
         return true;
       }
-      __builtin_unreachable();
-      return false;
+
+      AssertThrow(false, dealii::ExcInternalError());
+      __builtin_trap();
     }
 
     /**
@@ -299,9 +295,23 @@ namespace ryujin
     ACCESSOR_READ_ONLY(finite_element)
 
     /**
+     * Return a read-only const reference to a continuous ("cG") variant of
+     * the selected discontinuous finite element space.
+     *
+     * @note This object is unavailable for the dG Q0 discretization.
+     */
+    ACCESSOR_READ_ONLY(finite_element_cg)
+
+    /**
      * Return a read-only const reference to the quadrature rule.
      */
     ACCESSOR_READ_ONLY(quadrature)
+
+    /**
+     * Return a read-only const reference to the nodal quadrature rule
+     * (Gauß Lobatto).
+     */
+    ACCESSOR_READ_ONLY(nodal_quadrature)
 
     /**
      * Return a read-only const reference to the 1D quadrature rule.
@@ -315,7 +325,7 @@ namespace ryujin
 
     /**
      * Return a read-only const reference to the nodal face quadrature rule
-     * (GaußLobatto).
+     * (Gauß Lobatto).
      */
     ACCESSOR_READ_ONLY(face_nodal_quadrature)
 
@@ -325,7 +335,9 @@ namespace ryujin
     std::unique_ptr<Triangulation> triangulation_;
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
+    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_cg_;
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+    std::unique_ptr<const dealii::Quadrature<dim>> nodal_quadrature_;
     std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
     std::unique_ptr<const dealii::Quadrature<dim - 1>> face_quadrature_;
     std::unique_ptr<const dealii::Quadrature<dim - 1>> face_nodal_quadrature_;

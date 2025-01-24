@@ -128,43 +128,37 @@ namespace ryujin
     switch (ansatz_) {
     case Ansatz::cg_q1:
       finite_element_ = std::make_unique<FE_Q<dim>>(1);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(1);
       break;
     case Ansatz::cg_q2:
       finite_element_ = std::make_unique<FE_Q<dim>>(2);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(2);
       break;
     case Ansatz::cg_q3:
       finite_element_ = std::make_unique<FE_Q<dim>>(3);
-      break;
-    case Ansatz::dg_q0:
-      finite_element_ = std::make_unique<FE_DGQ<dim>>(0);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(3);
       break;
     case Ansatz::dg_q1:
       finite_element_ = std::make_unique<FE_DGQ<dim>>(1);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(1);
       break;
     case Ansatz::dg_q2:
       finite_element_ = std::make_unique<FE_DGQ<dim>>(2);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(2);
       break;
     case Ansatz::dg_q3:
       finite_element_ = std::make_unique<FE_DGQ<dim>>(3);
+      finite_element_cg_ = std::make_unique<FE_Q<dim>>(3);
       break;
     }
 
     switch (ansatz_) {
-    case Ansatz::dg_q0:
-      mapping_ = std::make_unique<MappingQ<dim>>(1);
-      quadrature_ = std::make_unique<QGauss<dim>>(1);
-      quadrature_1d_ = std::make_unique<QGauss<1>>(1);
-      face_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
-      if (dim > 1)
-        face_nodal_quadrature_ = std::make_unique<dealii::QMidpoint<dim - 1>>();
-      else
-        face_nodal_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
-      break;
     case Ansatz::cg_q1:
       [[fallthrough]];
     case Ansatz::dg_q1:
       mapping_ = std::make_unique<MappingQ<dim>>(1);
       quadrature_ = std::make_unique<QGauss<dim>>(2);
+      nodal_quadrature_ = std::make_unique<dealii::QGaussLobatto<dim>>(2);
       quadrature_1d_ = std::make_unique<QGauss<1>>(2);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(2);
       face_nodal_quadrature_ =
@@ -175,6 +169,7 @@ namespace ryujin
     case Ansatz::dg_q2:
       mapping_ = std::make_unique<MappingQ<dim>>(2);
       quadrature_ = std::make_unique<QGauss<dim>>(3);
+      nodal_quadrature_ = std::make_unique<dealii::QGaussLobatto<dim>>(3);
       quadrature_1d_ = std::make_unique<QGauss<1>>(3);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(3);
       face_nodal_quadrature_ =
@@ -185,6 +180,7 @@ namespace ryujin
     case Ansatz::dg_q3:
       mapping_ = std::make_unique<MappingQ<dim>>(3);
       quadrature_ = std::make_unique<QGauss<dim>>(4);
+      nodal_quadrature_ = std::make_unique<dealii::QGaussLobatto<dim>>(4);
       quadrature_1d_ = std::make_unique<QGauss<1>>(4);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(4);
       face_nodal_quadrature_ =
