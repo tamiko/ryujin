@@ -913,7 +913,7 @@ namespace ryujin
 
                   Number r_ij = 1.0;
 
-                  if (ansatz == Ansatz::dg_q0 || ansatz == Ansatz::dg_q2) {
+                  if (ansatz == Ansatz::dg_q2) {
                     /*
                      * For even polynomial degree we normalize the incidence
                      * matrix to (0.5 (m_i + m_j) / |Omega|) ^ (1.5 / d).

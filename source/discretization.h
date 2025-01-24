@@ -142,9 +142,6 @@ namespace ryujin
     /** cG Q3: continuous bi- (tri-) cubic Lagrange elements */
     cg_q3,
 
-    /** dG Q0: discontinuous piecewise constant elements */
-    dg_q0,
-
     /** dG Q1: discontinuous bi- (tri-) linear Lagrange elements */
     dg_q1,
 
@@ -171,7 +168,6 @@ DECLARE_ENUM(ryujin::Ansatz,
              LIST({ryujin::Ansatz::cg_q1, "cG Q1"},
                   {ryujin::Ansatz::cg_q2, "cG Q2"},
                   {ryujin::Ansatz::cg_q3, "cG Q3"},
-                  {ryujin::Ansatz::dg_q0, "dG Q0"},
                   {ryujin::Ansatz::dg_q1, "dG Q1"},
                   {ryujin::Ansatz::dg_q2, "dG Q2"},
                   {ryujin::Ansatz::dg_q3, "dG Q3"}));
@@ -260,8 +256,6 @@ namespace ryujin
         return false;
 
         /* Discontinuous Ansatz: */
-      case Ansatz::dg_q0:
-        [[fallthrough]];
       case Ansatz::dg_q1:
         [[fallthrough]];
       case Ansatz::dg_q2:

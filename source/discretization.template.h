@@ -135,9 +135,6 @@ namespace ryujin
     case Ansatz::cg_q3:
       finite_element_ = std::make_unique<FE_Q<dim>>(3);
       break;
-    case Ansatz::dg_q0:
-      finite_element_ = std::make_unique<FE_DGQ<dim>>(0);
-      break;
     case Ansatz::dg_q1:
       finite_element_ = std::make_unique<FE_DGQ<dim>>(1);
       break;
@@ -150,16 +147,6 @@ namespace ryujin
     }
 
     switch (ansatz_) {
-    case Ansatz::dg_q0:
-      mapping_ = std::make_unique<MappingQ<dim>>(1);
-      quadrature_ = std::make_unique<QGauss<dim>>(1);
-      quadrature_1d_ = std::make_unique<QGauss<1>>(1);
-      face_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
-      if (dim > 1)
-        face_nodal_quadrature_ = std::make_unique<dealii::QMidpoint<dim - 1>>();
-      else
-        face_nodal_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
-      break;
     case Ansatz::cg_q1:
       [[fallthrough]];
     case Ansatz::dg_q1:
