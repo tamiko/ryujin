@@ -100,11 +100,17 @@ namespace ryujin
      */
     void prepare(const unsigned int problem_dimension,
                  const unsigned int n_precomputed_values,
-                 const unsigned int n_parabolic_state_vectors)
+                 const unsigned int n_parabolic_state_vectors,
+                 bool create_matrices = true,
+                 bool create_multigrid_data = true)
     {
       setup(problem_dimension, n_precomputed_values);
-      assemble();
-      create_multigrid_data();
+
+      if (create_matrices)
+        this->create_matrices();
+
+      if (create_multigrid_data)
+        this->create_multigrid_data();
 
       n_parabolic_state_vectors_ = n_parabolic_state_vectors;
     }
@@ -209,7 +215,7 @@ namespace ryujin
 
     /**
      * A sparsity pattern for (standard deal.II) matrices storing indices
-     * in (Deal.II typical) global numbering.
+     * in (deal.II typical) global numbering.
      */
     ACCESSOR_READ_ONLY(sparsity_pattern)
 
@@ -300,7 +306,7 @@ namespace ryujin
     /**
      * Assemble all matrices.
      */
-    void assemble();
+    void create_matrices();
 
     /**
      * Create multigrid data.
