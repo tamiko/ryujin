@@ -318,30 +318,22 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      auto relaxed_bounds = bounds_;
-      auto &[u_min, u_max] = relaxed_bounds;
+      const auto &[u_min, u_max] = bounds_;
 
-      /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
+      auto relaxed_bounds = fully_relax_bounds(bounds_, hd_i);
+      auto &[u_min_relaxed, u_max_relaxed] = relaxed_bounds;
 
-      Number r_i = std::sqrt(hd_i);                              // in 3D: ^ 3/6
-      if constexpr (dim == 2)                                    //
-        r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
-      else if constexpr (dim == 1)                               //
-        r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
-      r_i *= parameters.relaxation_factor();
+      /* Apply a stricter window: */
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+
       const Number u_relaxation =
+          ScalarNumber(2. * parameters.relaxation_factor()) *
           std::abs(u_relaxation_numerator) /
           (std::abs(u_relaxation_denominator) + Number(eps));
 
-      u_min = std::max(
-          std::min((Number(1.) - r_i) * u_min, (Number(1.) + r_i) * u_min),
-          u_min - ScalarNumber(2.) * u_relaxation);
-
-      u_max = std::min(
-          std::max((Number(1.) + r_i) * u_max, (Number(1.) - r_i) * u_max),
-          u_max + ScalarNumber(2.) * u_relaxation);
+      u_min_relaxed = std::max(u_min_relaxed, u_min - u_relaxation);
+      u_max_relaxed = std::min(u_max_relaxed, u_max + u_relaxation);
 
       return relaxed_bounds;
     }
