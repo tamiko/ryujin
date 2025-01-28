@@ -365,32 +365,28 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      auto relaxed_bounds = bounds_;
-      auto &[h_min, h_max, v2_max] = relaxed_bounds;
+      const auto &[h_min, h_max, v2_max] = bounds_;
 
-      /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
+      auto relaxed_bounds = fully_relax_bounds(bounds_, hd_i);
+      auto &[h_min_relaxed, h_max_relaxed, v2_max_relaxed] = relaxed_bounds;
 
-      Number r_i = std::sqrt(hd_i);                              // in 3D: ^ 3/6
-      if constexpr (dim == 2)                                    //
-        r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
-      else if constexpr (dim == 1)                               //
-        r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
-      r_i *= parameters.relaxation_factor();
+      /* Apply a stricter window: */
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_relaxed = ScalarNumber(2.) *
-                               std::abs(h_relaxation_numerator) /
-                               (relaxation_denominator + Number(eps));
+      const Number h_relaxed =
+          ScalarNumber(2. * parameters.relaxation_factor()) *
+          std::abs(h_relaxation_numerator) /
+          (relaxation_denominator + Number(eps));
 
-      h_min = std::max((Number(1.) - r_i) * h_min, h_min - h_relaxed);
-      h_max = std::min((Number(1.) + r_i) * h_max, h_max + h_relaxed);
+      const Number v2_relaxed =
+          ScalarNumber(2. * parameters.relaxation_factor()) *
+          std::abs(v2_relaxation_numerator) /
+          (relaxation_denominator + Number(eps));
 
-      const Number v2_relaxed = ScalarNumber(2.) *
-                                std::abs(v2_relaxation_numerator) /
-                                (relaxation_denominator + Number(eps));
-
-      v2_max = std::min((Number(1.) + r_i) * v2_max, v2_max + v2_relaxed);
+      h_min_relaxed = std::max(h_min_relaxed, h_min - h_relaxed);
+      h_max_relaxed = std::min(h_max_relaxed, h_max + h_relaxed);
+      v2_max_relaxed = std::min(v2_max_relaxed, v2_max + v2_relaxed);
 
       return relaxed_bounds;
     }
