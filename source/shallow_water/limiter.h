@@ -134,6 +134,15 @@ namespace ryujin
       Bounds combine_bounds(const Bounds &bounds_left,
                             const Bounds &bounds_right) const;
 
+      /**
+       * This function applies a relaxation to a given a (strict) bound @p
+       * bounds using a non dimensionalized measure @p hd (that should
+       * scale as $h^d$, where $h$ is the local mesh size). This is done
+       * for the case of the shallow water equations by multiplying maximum
+       * bounds with $(1+r)$ and minimum bounds with $(1-r)$.
+       */
+      Bounds fully_relax_bounds(const Bounds &bounds, const Number &hd) const;
+
       //@}
       /**
        * @name Stencil-based computation of bounds
@@ -248,6 +257,32 @@ namespace ryujin
       return {std::min(h_min_l, h_min_r),
               std::max(h_max_l, h_max_r),
               std::max(v2_max_l, v2_max_r)};
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::fully_relax_bounds(const Bounds &bounds,
+                                             const Number &hd) const -> Bounds
+    {
+      auto relaxed_bounds = bounds;
+      auto &[h_min, h_max, v2_max] = relaxed_bounds;
+
+      /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
+
+      Number r = std::sqrt(hd);                              // in 3D: ^ 3/6
+      if constexpr (dim == 2)                                //
+        r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
+      else if constexpr (dim == 1)                           //
+        r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
+      r *= parameters.relaxation_factor();
+
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+      h_min *= std::max((Number(1.) - r), Number(eps));
+      h_max *= (Number(1.) + r);
+      v2_max *= (Number(1.) + r);
+
+      return relaxed_bounds;
     }
 
 
