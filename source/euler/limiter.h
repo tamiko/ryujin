@@ -396,17 +396,12 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      auto relaxed_bounds = bounds_;
-      auto &[rho_min, rho_max, s_min] = relaxed_bounds;
+      const auto &[rho_min, rho_max, s_min] = bounds_;
 
-      /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
+      auto relaxed_bounds = fully_relax_bounds(bounds_, hd_i);
+      auto &[rho_min_relaxed, rho_max_relaxed, s_min_relaxed] = relaxed_bounds;
 
-      Number r_i = std::sqrt(hd_i);                              // in 3D: ^ 3/6
-      if constexpr (dim == 2)                                    //
-        r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
-      else if constexpr (dim == 1)                               //
-        r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
-      r_i *= parameters.relaxation_factor();
+      /* Apply a stricter window: */
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       const Number rho_relaxation =
@@ -416,13 +411,12 @@ namespace ryujin
       const auto relaxation =
           ScalarNumber(2. * parameters.relaxation_factor()) * rho_relaxation;
 
-      rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - relaxation);
-      rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + relaxation);
-
       const auto entropy_relaxation =
           parameters.relaxation_factor() * (s_interp_max - s_min);
 
-      s_min = std::max((Number(1.) - r_i) * s_min, s_min - entropy_relaxation);
+      rho_min_relaxed = std::max(rho_min_relaxed, rho_min - relaxation);
+      rho_max_relaxed = std::min(rho_max_relaxed, rho_max + relaxation);
+      s_min_relaxed = std::max(s_min_relaxed, s_min - entropy_relaxation);
 
       return relaxed_bounds;
     }
