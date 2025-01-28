@@ -404,18 +404,17 @@ namespace ryujin
       /* Apply a stricter window: */
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const Number rho_relaxation =
+
+      const auto rho_relaxation =
+          ScalarNumber(2. * parameters.relaxation_factor()) *
           std::abs(rho_relaxation_numerator) /
           (std::abs(rho_relaxation_denominator) + Number(eps));
-
-      const auto relaxation =
-          ScalarNumber(2. * parameters.relaxation_factor()) * rho_relaxation;
 
       const auto entropy_relaxation =
           parameters.relaxation_factor() * (s_interp_max - s_min);
 
-      rho_min_relaxed = std::max(rho_min_relaxed, rho_min - relaxation);
-      rho_max_relaxed = std::min(rho_max_relaxed, rho_max + relaxation);
+      rho_min_relaxed = std::max(rho_min_relaxed, rho_min - rho_relaxation);
+      rho_max_relaxed = std::min(rho_max_relaxed, rho_max + rho_relaxation);
       s_min_relaxed = std::max(s_min_relaxed, s_min - entropy_relaxation);
 
       return relaxed_bounds;
