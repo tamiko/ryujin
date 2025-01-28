@@ -116,6 +116,13 @@ namespace ryujin
       Bounds combine_bounds(const Bounds &bounds_left,
                             const Bounds &bounds_right) const;
 
+      /**
+       * This function applies a relaxation to a given a (strict) bound @p
+       * bounds using a non dimensionalized measure @p hd (that should
+       * scale as $h^d$, where $h$ is the local mesh size).
+       */
+      Bounds fully_relax_bounds(const Bounds &bounds, const Number &hd) const;
+
       //@}
       /**
        * @name Stencil-based computation of bounds
@@ -220,6 +227,30 @@ namespace ryujin
       const auto &[u_min_r, u_max_r] = bounds_right;
 
       return {std::min(u_min_l, u_min_r), std::max(u_max_l, u_max_r)};
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::fully_relax_bounds(const Bounds &bounds,
+                                             const Number &hd) const -> Bounds
+    {
+      auto relaxed_bounds = bounds;
+      auto &[u_min, u_max] = relaxed_bounds;
+
+      /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
+
+      Number r = std::sqrt(hd);                              // in 3D: ^ 3/6
+      if constexpr (dim == 2)                                //
+        r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
+      else if constexpr (dim == 1)                           //
+        r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
+      r *= parameters.relaxation_factor();
+
+      u_min = std::min((Number(1.) - r) * u_min, (Number(1.) + r) * u_min);
+      u_max = std::max((Number(1.) + r) * u_max, (Number(1.) - r) * u_max);
+
+      return relaxed_bounds;
     }
 
 
