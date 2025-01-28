@@ -160,6 +160,16 @@ namespace ryujin
       Bounds combine_bounds(const Bounds &bounds_left,
                             const Bounds &bounds_right) const;
 
+      /**
+       * This function applies a relaxation to a given a (strict) bound @p
+       * bounds using a non dimensionalized measure @p hd (that should
+       * scale as $h^d$, where $h$ is the local mesh size). This is done
+       * for the case of the Euler equations by multiplying maximum bounds
+       * with $(1+r)$ and minimum bounds with $(1-r)$, while ensuring that
+       * the bounds still describe an admissible state.
+       */
+      Bounds fully_relax_bounds(const Bounds &bounds, const Number &hd) const;
+
       //@}
       /**
        * @name Stencil-based computation of bounds
@@ -278,6 +288,32 @@ namespace ryujin
       return {std::min(rho_min_l, rho_min_r),
               std::max(rho_max_l, rho_max_r),
               std::min(s_min_l, s_min_r)};
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::fully_relax_bounds(const Bounds &bounds,
+                                             const Number &hd) const -> Bounds
+    {
+      auto relaxed_bounds = bounds;
+      auto &[rho_min, rho_max, s_min] = relaxed_bounds;
+
+      /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
+
+      Number r = std::sqrt(hd);                              // in 3D: ^ 3/6
+      if constexpr (dim == 2)                                //
+        r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
+      else if constexpr (dim == 1)                           //
+        r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
+      r *= parameters.relaxation_factor();
+
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+      rho_min *= std::max(Number(1.) - r, Number(eps));
+      rho_max *= (Number(1.) + r);
+      s_min *= std::max(Number(1.) - r, Number(eps));
+
+      return relaxed_bounds;
     }
 
 
