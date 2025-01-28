@@ -27,7 +27,7 @@ namespace ryujin
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
 
-        if constexpr (std::is_same<ScalarNumber, double>::value)
+        if constexpr (std::is_same_v<ScalarNumber, double>)
           newton_tolerance_ = 1.e-10;
         else
           newton_tolerance_ = 1.e-4;
@@ -161,6 +161,16 @@ namespace ryujin
       Bounds combine_bounds(const Bounds &bounds_left,
                             const Bounds &bounds_right) const;
 
+      /**
+       * This function applies a relaxation to a given a (strict) bound @p
+       * bounds using a non dimensionalized measure @p hd (that should
+       * scale as $h^d$, where $h$ is the local mesh size). This is done
+       * for the case of the Euler equations by multiplying maximum bounds
+       * with $(1+r)$ and minimum bounds with $(1-r)$, while ensuring that
+       * the bounds still describe an admissible state.
+       */
+      Bounds fully_relax_bounds(const Bounds &bounds, const Number &hd) const;
+
       //@}
       /**
        * @name Stencil-based computation of bounds
@@ -225,7 +235,7 @@ namespace ryujin
                                      const state_type &U,
                                      const state_type &P,
                                      const Number t_min = Number(0.),
-                                     const Number t_max = Number(1.));
+                                     const Number t_max = Number(1.)) const;
 
     private:
       //@}
@@ -284,6 +294,51 @@ namespace ryujin
               std::max(rho_max_l, rho_max_r),
               std::min(s_min_l, s_min_r),
               std::min(gamma_min_l, gamma_min_r)};
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::fully_relax_bounds(const Bounds &bounds,
+                                             const Number &hd) const -> Bounds
+    {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      const auto &[rho_min, rho_max, s_min, gamma_min] = bounds;
+
+      auto relaxed_bounds = bounds;
+      auto &[rho_min_relaxed, rho_max_relaxed, s_min_relaxed, g_m_relaxed] =
+          relaxed_bounds;
+
+      /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
+
+      Number r = std::sqrt(hd);                              // in 3D: ^ 3/6
+      if constexpr (dim == 2)                                //
+        r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
+      else if constexpr (dim == 1)                           //
+        r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
+      r *= parameters.relaxation_factor();
+
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+      rho_min_relaxed *= std::max(Number(1.) - r, Number(eps));
+      rho_max_relaxed *= (Number(1.) + r);
+      s_min_relaxed *= std::max(Number(1.) - r, Number(eps));
+
+      /*
+       * If we have a maximum compressibility constant, b, the maximum
+       * bound for rho changes. See @cite ryujin-2023-4 for how to define
+       * rho_max.
+       */
+
+      const auto numerator = (gamma_min + Number(1.)) * rho_max;
+      const auto interpolation_b = view.eos_interpolation_b();
+      const auto denominator =
+          gamma_min - Number(1.) + ScalarNumber(2.) * interpolation_b * rho_max;
+      const auto rho_compressibility_bound = numerator / denominator;
+
+      rho_max_relaxed = std::min(rho_compressibility_bound, rho_max_relaxed);
+
+      return relaxed_bounds;
     }
 
 
@@ -410,49 +465,27 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
+      const auto &[rho_min, rho_max, s_min, gamma_min] = bounds_;
 
-      auto relaxed_bounds = bounds_;
-      auto &[rho_min, rho_max, s_min, gamma_min] = relaxed_bounds;
+      auto relaxed_bounds = fully_relax_bounds(bounds_, hd_i);
+      auto &[rho_min_relaxed, rho_max_relaxed, s_min_relaxed, g_m_relaxed] =
+          relaxed_bounds;
 
-      /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
-
-      Number r_i = std::sqrt(hd_i);                              // in 3D: ^ 3/6
-      if constexpr (dim == 2)                                    //
-        r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
-      else if constexpr (dim == 1)                               //
-        r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
-      r_i *= parameters.relaxation_factor();
+      /* Apply a stricter window: */
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const Number rho_relaxation =
+
+      const auto rho_relaxation =
+          ScalarNumber(2. * parameters.relaxation_factor()) *
           std::abs(rho_relaxation_numerator) /
           (std::abs(rho_relaxation_denominator) + Number(eps));
-
-      const auto relaxation =
-          ScalarNumber(2. * parameters.relaxation_factor()) * rho_relaxation;
-
-      rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - relaxation);
-      rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + relaxation);
 
       const auto entropy_relaxation =
           parameters.relaxation_factor() * (s_interp_max - s_min);
 
-      s_min = std::max((Number(1.) - r_i) * s_min, s_min - entropy_relaxation);
-
-      /*
-       * If we have a maximum compressibility constant, b, the maximum
-       * bound for rho changes. See @cite ryujin-2023-4 for how to define
-       * rho_max.
-       */
-
-      const auto numerator = (gamma_min + Number(1.)) * rho_max;
-      const auto interpolation_b = view.eos_interpolation_b();
-      const auto denominator =
-          gamma_min - Number(1.) + ScalarNumber(2.) * interpolation_b * rho_max;
-      const auto upper_bound = numerator / denominator;
-
-      rho_max = std::min(upper_bound, rho_max);
+      rho_min_relaxed = std::max(rho_min_relaxed, rho_min - rho_relaxation);
+      rho_max_relaxed = std::min(rho_max_relaxed, rho_max + rho_relaxation);
+      s_min_relaxed = std::max(s_min_relaxed, s_min - entropy_relaxation);
 
       return relaxed_bounds;
     }

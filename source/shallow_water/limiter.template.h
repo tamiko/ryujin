@@ -19,7 +19,7 @@ namespace ryujin
                                 const state_type &U,
                                 const state_type &P,
                                 const Number t_min /* = Number(0.) */,
-                                const Number t_max /* = Number(1.) */)
+                                const Number t_max /* = Number(1.) */) const
     {
       const auto view = hyperbolic_system.view<dim, Number>();
 

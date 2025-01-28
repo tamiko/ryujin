@@ -109,6 +109,17 @@ namespace ryujin
         return Bounds{};
       }
 
+      /**
+       * This function applies a relaxation to a given a (strict) bound @p
+       * bounds using a non dimensionalized measure @p hd (that should
+       * scale as $h^d$, where $h$ is the local mesh size).
+       */
+      Bounds fully_relax_bounds(const Bounds & /*bounds*/,
+                                const Number & /*hd*/) const
+      {
+        return Bounds{};
+      }
+
       //@}
       /**
        * @name Stencil-based computation of bounds
@@ -155,9 +166,9 @@ namespace ryujin
       /**
        * Return the computed bounds (with relaxation applied).
        */
-      Bounds bounds(const Number /*hd_i*/) const
+      Bounds bounds(const Number hd_i) const
       {
-        auto relaxed_bounds = bounds_;
+        auto relaxed_bounds = fully_relax_bounds(bounds_, hd_i);
 
         return relaxed_bounds;
       }
@@ -176,7 +187,7 @@ namespace ryujin
                                      const state_type & /*U*/,
                                      const state_type & /*P*/,
                                      const Number /*t_min*/ = Number(0.),
-                                     const Number t_max = Number(1.))
+                                     const Number t_max = Number(1.)) const
       {
         return {t_max, true};
       }
