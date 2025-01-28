@@ -304,8 +304,11 @@ namespace ryujin
     {
       const auto view = hyperbolic_system.view<dim, Number>();
 
+      const auto &[rho_min, rho_max, s_min, gamma_min] = bounds;
+
       auto relaxed_bounds = bounds;
-      auto &[rho_min, rho_max, s_min, gamma_min] = relaxed_bounds;
+      auto &[rho_min_relaxed, rho_max_relaxed, s_min_relaxed, g_m_relaxed] =
+          relaxed_bounds;
 
       /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -317,9 +320,9 @@ namespace ryujin
       r *= parameters.relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      rho_min *= std::max(Number(1.) - r, Number(eps));
-      rho_max *= (Number(1.) + r);
-      s_min *= std::max(Number(1.) - r, Number(eps));
+      rho_min_relaxed *= std::max(Number(1.) - r, Number(eps));
+      rho_max_relaxed *= (Number(1.) + r);
+      s_min_relaxed *= std::max(Number(1.) - r, Number(eps));
 
       /*
        * If we have a maximum compressibility constant, b, the maximum
@@ -333,7 +336,7 @@ namespace ryujin
           gamma_min - Number(1.) + ScalarNumber(2.) * interpolation_b * rho_max;
       const auto rho_compressibility_bound = numerator / denominator;
 
-      rho_max = std::min(rho_compressibility_bound, rho_max);
+      rho_max_relaxed = std::min(rho_compressibility_bound, rho_max_relaxed);
 
       return relaxed_bounds;
     }
