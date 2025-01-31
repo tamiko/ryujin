@@ -69,11 +69,12 @@ project(ryujin CXX)
 set(NUMBER "double" CACHE STRING "The principal floating point type")
 
 option(ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
-option(EXPENSIVE_BOUNDS_CHECK "Enable debug code paths that enable additional limiter bounds checks" OFF)
-option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
+option(DEBUG_EXPENSIVE_BOUNDS_CHECK "Debug: enable debug code paths for additional limiter bounds checks" OFF)
+option(DEBUG_OUTPUT "Debug: enable detailed time-step output" OFF)
+option(DEBUG_SANITIZER "Debug: enable address and UBSAN sanitizers for DEBUG build" OFF)
+option(DEBUG_SYMMETRY_CHECK "Debug: enable debug code paths that verify d_ij, c_ij, m_ij for (anti)symmetry" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
-option(SANITIZER "Enable address and UBSAN sanitizers for DEBUG build" OFF)
 
 #
 # External packages:
@@ -135,7 +136,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
-if(SANITIZER)
+if(DEBUG_SANITIZER)
   string(APPEND DEAL_II_CXX_FLAGS_DEBUG
     " -fsanitize=address,undefined,leak -fsanitize-address-use-after-return=always -fsanitize-address-use-after-scope"
     )

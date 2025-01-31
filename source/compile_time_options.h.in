@@ -9,13 +9,15 @@
 
 #define NUMBER @NUMBER@
 
-#cmakedefine EXPENSIVE_BOUNDS_CHECK
-#if defined(DEBUG) && !defined(EXPENSIVE_BOUNDS_CHECK)
-#define EXPENSIVE_BOUNDS_CHECK
-#endif
+/* Debug options: */
+
+#cmakedefine DEBUG_OUTPUT
+#cmakedefine DEBUG_EXPENSIVE_BOUNDS_CHECK
+#cmakedefine DEBUG_SYMMETRY_CHECK
+
+/* Compile-time parameters: */
 
 #cmakedefine ASYNC_MPI_EXCHANGE
-#cmakedefine DEBUG_OUTPUT
 #cmakedefine DENORMALS_ARE_ZERO
 #cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 

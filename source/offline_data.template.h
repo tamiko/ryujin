@@ -1010,7 +1010,7 @@ namespace ryujin
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
     }
 
-#ifdef DEBUG
+#ifdef DEBUG_SYMMETRY_CHECK
     /*
      * Verify that we have consistent mass:
      */
