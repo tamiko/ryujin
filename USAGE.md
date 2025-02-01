@@ -123,12 +123,13 @@ are best kept at their default values. For completeness we list all
 configuration options here:
   - `CMAKE_BUILD_TYPE`: build ryujin in "Release" or "Debug" mode
   - `NUMBER`: select "double" for double precision or "float" for single precision (defaults to double)
-  - `EXPENSIVE_BOUNDS_CHECK`: enable additional bounds checking (defaults to OFF)
-  - `DEBUG_OUTPUT`: enable debug output (defaults to OFF)
   - `ASYNC_MPI_EXCHANGE`: enable asynchronous "communication hiding" MPI exchange (defaults to OFF)
+  - `DEBUG_EXPENSIVE_BOUNDS_CHECK`: enable debug code paths for additional limiter bounds checks (defaults to OFF)
+  - `DEBUG_OUTPUT`: enable debug output (defaults to OFF)
+  - `DEBUG_SANITIZER`: enable address and UBSAN sanitizers for DEBUG build (defaults to OFF)
+  - `DEBUG_SYMMETRY_CHECK`: Debug: enable debug code paths that verify d_ij, c_ij, m_ij for (anti)symmetry (defaults to OFF)
   - `DENORMALS_ARE_ZERO`: disable floating point denormals (defaults to ON)
   - `FORCE_DEAL_II_SPARSE_MATRIX`: prefer deal.II sparse matrix for preliminary assembly instead of Trilinos
-  - `SANITIZER`: enable address and UBSAN sanitizers for DEBUG build
   - `WITH_CALLGRIND`: enable Valgrind/Callgrind stetoscope mode (default to OFF)
   - `WITH_DOXYGEN`: enable support for doxygen and build documentation
   - `WITH_EOSPAC`: enable support for the EOSPAC6/Sesame tabulated equation of state database (autodetection)

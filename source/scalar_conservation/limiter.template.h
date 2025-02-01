@@ -98,7 +98,7 @@ namespace ryujin
       t_r = std::min(t_r, t_max);
       t_r = std::max(t_r, t_min);
 
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
       /*
        * Verify that the new state is within bounds:
        *

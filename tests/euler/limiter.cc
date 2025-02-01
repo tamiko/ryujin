@@ -7,7 +7,7 @@
 
 #include <limiter.h>
 
-#define EXPENSIVE_BOUNDS_CHECK
+#define DEBUG_EXPENSIVE_BOUNDS_CHECK
 #define DEBUG_OUTPUT
 #define DEBUG_OUTPUT_LIMITER
 #include <limiter.template.h>

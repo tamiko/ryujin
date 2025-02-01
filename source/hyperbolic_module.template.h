@@ -512,7 +512,7 @@ namespace ryujin
           if (j < i) {
             const auto d_ji = dij_matrix_.get_transposed_entry(i, col_idx);
 
-#ifdef DEBUG
+#ifdef DEBUG_SYMMETRY_CHECK
             /* Verify that d_ji == std::max(d_ij, d_ji): */
 
             const auto U_i = old_U.get_tensor(i);
@@ -743,7 +743,7 @@ namespace ryujin
 
             const auto d_ijH = d_ij * factor;
 
-#ifdef DEBUG
+#ifdef DEBUG_SYMMETRY_CHECK
             /*
              * Verify that all local chunks of the d_ij matrix have been
              * computed consistently over all MPI ranks. For that we import
@@ -855,7 +855,7 @@ namespace ryujin
             pij_matrix_.write_entry(P_ij, i, col_idx, true);
           }
 
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
           if (!view.is_admissible(U_i_new)) {
             restart_needed = true;
           }
@@ -1125,7 +1125,7 @@ namespace ryujin
               lij_row[col_idx] = l_ij;
           }
 
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
           const auto view = hyperbolic_system_->template view<dim, T>();
           if (!view.is_admissible(U_i_new)) {
             restart_needed = true;
@@ -1162,7 +1162,7 @@ namespace ryujin
              * signal a restart condition if the `EXPENSIVE_BOUNDS_CHECK` debug
              * macro is defined.
              */
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
             if (!success)
               restart_needed = true;
 #endif
