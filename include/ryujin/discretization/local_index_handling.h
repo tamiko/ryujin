@@ -1,0 +1,368 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2020 - 2026 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/base/compile_time_options.h>
+
+#include <deal.II/base/partitioner.h>
+#include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_renumbering.h>
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/lac/affine_constraints.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
+#include <deal.II/lac/sparsity_tools.h>
+
+namespace ryujin
+{
+  template <typename Number>
+  void transform_to_local_range(
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      dealii::AffineConstraints<Number> &affine_constraints)
+  {
+    affine_constraints.close();
+
+    dealii::AffineConstraints<Number> temporary;
+
+    for (auto line : affine_constraints.get_lines()) {
+      line.index = partitioner.global_to_local(line.index);
+      std::transform(line.entries.begin(),
+                     line.entries.end(),
+                     line.entries.begin(),
+                     [&](auto entry) {
+                       return std::make_pair(
+                           partitioner.global_to_local(entry.first),
+                           entry.second);
+                     });
+
+      temporary.add_line(line.index);
+      temporary.add_entries(line.index, line.entries);
+      temporary.set_inhomogeneity(line.index, line.inhomogeneity);
+    }
+
+    temporary.close();
+
+    affine_constraints = std::move(temporary);
+  }
+
+
+  template <typename VECTOR>
+  void transform_to_local_range(
+      const dealii::Utilities::MPI::Partitioner &partitioner, VECTOR &vector)
+  {
+    std::transform(
+        vector.begin(), vector.end(), vector.begin(), [&](auto index) {
+          return partitioner.global_to_local(index);
+        });
+  }
+
+
+  namespace DoFRenumbering
+  {
+    using dealii::DoFRenumbering::Cuthill_McKee;
+
+    template <int dim>
+    unsigned int export_indices_first(dealii::DoFHandler<dim> &dof_handler,
+                                      const MPI_Comm &mpi_communicator,
+                                      const unsigned int n_locally_internal,
+                                      const std::size_t warp_size)
+    {
+      using namespace dealii;
+
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      const auto n_locally_owned = locally_owned.n_elements();
+
+      Assert(locally_owned.is_contiguous() == true,
+             dealii::ExcMessage(
+                 "Need a contiguous set of locally owned indices."));
+
+      const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
+
+      const auto locally_relevant =
+          DoFTools::extract_locally_relevant_dofs(dof_handler);
+
+      Utilities::MPI::Partitioner partitioner(
+          locally_owned, locally_relevant, mpi_communicator);
+
+      IndexSet export_indices(n_locally_owned);
+      for (const auto &it : partitioner.import_indices()) {
+        export_indices.add_range(it.first, it.second);
+      }
+
+      std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
+
+      unsigned int n_export_indices = 0;
+
+      Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
+
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
+        bool export_index_present = false;
+        for (unsigned int j = 0; j < warp_size; ++j) {
+          if (export_indices.is_element(i + j)) {
+            export_index_present = true;
+            break;
+          }
+        }
+
+        if (export_index_present) {
+          Assert(n_export_indices % warp_size == 0, dealii::ExcInternalError());
+          for (unsigned int j = 0; j < warp_size; ++j) {
+            new_order[i + j] = offset + n_export_indices++;
+          }
+        } else {
+          for (unsigned int j = 0; j < warp_size; ++j)
+            new_order[i + j] = dealii::numbers::invalid_dof_index;
+        }
+      }
+
+#if DEBUG
+      unsigned int n_other = 0;
+      for (unsigned int i = n_locally_internal; i < n_locally_owned; ++i)
+        if (export_indices.is_element(i))
+          n_other++;
+
+      Assert(n_other + n_export_indices >= export_indices.n_elements(),
+             dealii::ExcInternalError());
+#endif
+
+      unsigned int running_index = n_export_indices;
+
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
+        if (new_order[i] == dealii::numbers::invalid_dof_index) {
+          for (unsigned int j = 0; j < warp_size; ++j) {
+            Assert(new_order[i + j] == dealii::numbers::invalid_dof_index,
+                   dealii::ExcInternalError());
+            new_order[i + j] = offset + running_index++;
+          }
+        }
+      }
+
+      Assert(running_index == n_locally_internal, dealii::ExcInternalError());
+
+      for (unsigned int i = n_locally_internal; i < n_locally_owned; i++) {
+        new_order[i] = offset + running_index++;
+      }
+
+      Assert(running_index == n_locally_owned, dealii::ExcInternalError());
+
+      dof_handler.renumber_dofs(new_order);
+
+      Assert(n_export_indices % warp_size == 0, dealii::ExcInternalError());
+      Assert(n_export_indices <= n_locally_internal,
+             dealii::ExcInternalError());
+      return n_export_indices;
+    }
+
+
+    template <int dim>
+    unsigned int
+    inconsistent_strides_last(dealii::DoFHandler<dim> &dof_handler,
+                              const dealii::DynamicSparsityPattern &sparsity,
+                              const unsigned int n_locally_internal,
+                              const std::size_t warp_size)
+    {
+      using namespace dealii;
+
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      const auto n_locally_owned = locally_owned.n_elements();
+
+      Assert(locally_owned.is_contiguous() == true,
+             dealii::ExcMessage(
+                 "Need a contiguous set of locally owned indices."));
+
+      const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
+
+      std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
+
+      unsigned int n_consistent_range = 0;
+
+      Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
+
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
+
+        bool stride_is_consistent = true;
+        const auto warp_row_length = sparsity.row_length(offset + i);
+        for (unsigned int j = 0; j < warp_size; ++j) {
+          if (warp_row_length != sparsity.row_length(offset + i + j)) {
+            stride_is_consistent = false;
+            break;
+          }
+        }
+
+        if (stride_is_consistent) {
+          for (unsigned int j = 0; j < warp_size; ++j) {
+            new_order[i + j] = offset + n_consistent_range++;
+          }
+        } else {
+          for (unsigned int j = 0; j < warp_size; ++j)
+            new_order[i + j] = dealii::numbers::invalid_dof_index;
+        }
+      }
+
+      unsigned int running_index = n_consistent_range;
+
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
+        if (new_order[i] == dealii::numbers::invalid_dof_index) {
+          for (unsigned int j = 0; j < warp_size; ++j) {
+            Assert(new_order[i + j] == dealii::numbers::invalid_dof_index,
+                   dealii::ExcInternalError());
+            new_order[i + j] = offset + running_index++;
+          }
+        }
+      }
+
+      Assert(running_index == n_locally_internal, dealii::ExcInternalError());
+
+      for (unsigned int i = n_locally_internal; i < n_locally_owned; i++) {
+        new_order[i] = offset + running_index++;
+      }
+
+      Assert(running_index == n_locally_owned, dealii::ExcInternalError());
+
+      dof_handler.renumber_dofs(new_order);
+
+      Assert(n_consistent_range % warp_size == 0, dealii::ExcInternalError());
+      Assert(n_consistent_range <= n_locally_internal,
+             dealii::ExcInternalError());
+      return n_consistent_range;
+    }
+
+
+    template <int dim>
+    unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler,
+                                const dealii::DynamicSparsityPattern &sparsity,
+                                const std::size_t warp_size)
+    {
+      using namespace dealii;
+
+      const auto &locally_owned = dof_handler.locally_owned_dofs();
+      const auto n_locally_owned = locally_owned.n_elements();
+
+      Assert(locally_owned.is_contiguous() == true,
+             dealii::ExcMessage(
+                 "Need a contiguous set of locally owned indices."));
+
+      const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
+
+      using dof_type = dealii::types::global_dof_index;
+      std::vector<dof_type> new_order(n_locally_owned);
+      dof_type current_index = offset;
+
+      std::map<unsigned int, std::set<dof_type>> bins;
+
+      for (unsigned int i = 0; i < n_locally_owned; ++i) {
+        const dof_type index = i;
+        const unsigned int row_length = sparsity.row_length(offset + index);
+        bins[row_length].insert(index);
+
+        if (bins[row_length].size() == warp_size) {
+          for (const auto &index : bins[row_length])
+            new_order[index] = current_index++;
+          bins.erase(row_length);
+        }
+      }
+
+      unsigned int n_locally_internal = current_index - offset;
+
+      for (const auto &entries : bins) {
+        Assert(entries.second.size() > 0, ExcInternalError());
+        for (const auto &index : entries.second)
+          new_order[index] = current_index++;
+      }
+      Assert(current_index == offset + n_locally_owned, ExcInternalError());
+
+      dof_handler.renumber_dofs(new_order);
+
+      Assert(n_locally_internal % warp_size == 0, ExcInternalError());
+      return n_locally_internal;
+    }
+  } // namespace DoFRenumbering
+
+
+  namespace DoFTools
+  {
+    using dealii::DoFTools::extract_locally_relevant_dofs;
+
+    using dealii::DoFTools::make_hanging_node_constraints;
+
+    using dealii::DoFTools::make_periodicity_constraints;
+
+    using dealii::DoFTools::make_sparsity_pattern;
+
+
+    template <int dim, typename Number, typename SPARSITY>
+    void make_extended_sparsity_pattern_dg(
+        const dealii::DoFHandler<dim> &dof_handler,
+        SPARSITY &dsp,
+        const dealii::AffineConstraints<Number> &affine_constraints,
+        bool keep_constrained)
+    {
+      Assert(affine_constraints.n_constraints() == 0,
+             dealii::ExcMessage("I don't think constraints make sense for dG"));
+
+      std::vector<dealii::types::global_dof_index> dof_indices;
+      std::vector<dealii::types::global_dof_index> neighbor_dof_indices;
+
+      std::vector<dealii::types::global_dof_index> coupling_indices;
+      std::vector<dealii::types::global_dof_index> neighbor_coupling_indices;
+
+      for (auto cell : dof_handler.active_cell_iterators()) {
+        if (cell->is_artificial())
+          continue;
+
+        const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+        dof_indices.resize(dofs_per_cell);
+        cell->get_dof_indices(dof_indices);
+
+        affine_constraints.add_entries_local_to_global(
+            dof_indices, dsp, keep_constrained);
+
+        for (const auto f_index : cell->face_indices()) {
+          const auto &face = cell->face(f_index);
+
+          const bool has_neighbor =
+              !face->at_boundary() || cell->has_periodic_neighbor(f_index);
+          if (!has_neighbor)
+            continue;
+
+          const auto neighbor_cell =
+              cell->neighbor_or_periodic_neighbor(f_index);
+          if (neighbor_cell->is_artificial())
+            continue;
+
+          const unsigned int neighbor_dofs_per_cell =
+              neighbor_cell->get_fe().n_dofs_per_cell();
+          neighbor_dof_indices.resize(neighbor_dofs_per_cell);
+          neighbor_cell->get_dof_indices(neighbor_dof_indices);
+
+          const unsigned int f_index_neighbor =
+              cell->has_periodic_neighbor(f_index)
+                  ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
+                  : cell->neighbor_of_neighbor(f_index);
+
+          coupling_indices.resize(0);
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            if (cell->get_fe().has_support_on_face(i, f_index))
+              coupling_indices.push_back(dof_indices[i]);
+
+          neighbor_coupling_indices.resize(0);
+          for (unsigned int j = 0; j < neighbor_dofs_per_cell; ++j)
+            if (neighbor_cell->get_fe().has_support_on_face(j,
+                                                            f_index_neighbor))
+              neighbor_coupling_indices.push_back(neighbor_dof_indices[j]);
+
+          affine_constraints.add_entries_local_to_global(
+              coupling_indices,
+              neighbor_coupling_indices,
+              dsp,
+              keep_constrained);
+        }
+      }
+    }
+
+
+  } // namespace DoFTools
+
+} // namespace ryujin

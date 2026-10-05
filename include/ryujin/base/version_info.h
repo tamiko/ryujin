@@ -1,0 +1,15 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2024 - 2025 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/base/compile_time_options.h>
+
+#include <ostream>
+
+namespace ryujin
+{
+  void print_revision_and_version(std::ostream &stream);
+} // namespace ryujin

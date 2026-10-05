@@ -1,0 +1,303 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2020 - 2026 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/dependent/initial_values.h>
+
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/vector_tools.templates.h>
+
+#include <functional>
+#include <random>
+
+namespace ryujin
+{
+  using namespace dealii;
+
+  template <typename HyperbolicDescription, int dim, typename Number>
+  InitialValues<HyperbolicDescription, dim, Number>::InitialValues(
+      const MPIEnsemble &mpi_ensemble,
+      const OfflineData<dim, Number> &offline_data,
+      const HyperbolicSystem &hyperbolic_system,
+      const std::string &subsection)
+      : Interface::InitialValues<dim, Number>(subsection)
+      , mpi_ensemble_(mpi_ensemble)
+      , offline_data_(&offline_data)
+      , hyperbolic_system_(&hyperbolic_system)
+  {
+    this->parse_parameters_call_back.connect(
+        std::bind(&InitialValues<HyperbolicDescription, dim, Number>::
+                      parse_parameters_callback,
+                  this));
+
+    configuration_ = "uniform";
+    this->add_parameter(
+        "configuration",
+        configuration_,
+        "The initial state configuration. Valid names are given by "
+        "any of the subsections defined below.");
+
+    initial_direction_[0] = 1.;
+    this->add_parameter(
+        "direction",
+        initial_direction_,
+        "Initial direction of initial configuration (Galilei transform)");
+
+    initial_position_[0] = 1.;
+    this->add_parameter(
+        "position",
+        initial_position_,
+        "Initial position of initial configuration (Galilei transform)");
+
+    perturbation_ = 0.;
+    this->add_parameter(
+        "perturbation",
+        perturbation_,
+        "Add a random perturbation of the specified magnitude to the "
+        "initial state.");
+
+    InitialStateLibrary<HyperbolicDescription, dim, Number>::
+        populate_initial_state_list(
+            initial_state_list_, *hyperbolic_system_, subsection);
+  }
+
+  namespace
+  {
+    template <int dim>
+    inline DEAL_II_ALWAYS_INLINE dealii::Point<dim>
+    affine_transform(const dealii::Tensor<1, dim> initial_direction,
+                     const dealii::Point<dim> initial_position,
+                     const dealii::Point<dim> x)
+    {
+      auto direction = x - initial_position;
+
+      if constexpr (dim == 3) {
+        auto n_x = initial_direction[0];
+        auto n_z = initial_direction[2];
+        const auto norm = std::sqrt(n_x * n_x + n_z * n_z);
+        n_x /= norm;
+        n_z /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] + n_z * direction[2];
+          new_direction[2] = -n_z * direction[0] + n_x * direction[2];
+        }
+        direction = new_direction;
+      }
+
+      if constexpr (dim >= 2) {
+        auto n_x = initial_direction[0];
+        auto n_y = initial_direction[1];
+        const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
+        n_x /= norm;
+        n_y /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] + n_y * direction[1];
+          new_direction[1] = -n_y * direction[0] + n_x * direction[1];
+        }
+        direction = new_direction;
+      }
+
+      if constexpr (dim == 1) {
+        auto n = initial_direction[0];
+        const auto norm = std::abs(n);
+        n /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14)
+          new_direction[0] = n * direction[0];
+        direction = new_direction;
+      }
+
+      return Point<dim>() + direction;
+    }
+
+
+    template <int dim, typename Number>
+    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    affine_transform_vector(const dealii::Tensor<1, dim> initial_direction,
+                            dealii::Tensor<1, dim, Number> direction)
+    {
+      if constexpr (dim == 1) {
+        auto n = initial_direction[0];
+        const auto norm = std::abs(n);
+        n /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14)
+          new_direction[0] = n * direction[0];
+        direction = new_direction;
+      }
+
+      if constexpr (dim >= 2) {
+        auto n_x = initial_direction[0];
+        auto n_y = initial_direction[1];
+        const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
+        n_x /= norm;
+        n_y /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] - n_y * direction[1];
+          new_direction[1] = n_y * direction[0] + n_x * direction[1];
+        }
+        direction = new_direction;
+      }
+
+      if constexpr (dim == 3) {
+        auto n_x = initial_direction[0];
+        auto n_z = initial_direction[2];
+        const auto norm = std::sqrt(n_x * n_x + n_z * n_z);
+        n_x /= norm;
+        n_z /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] - n_z * direction[2];
+          new_direction[2] = n_z * direction[0] + n_x * direction[2];
+        }
+        direction = new_direction;
+      }
+
+      return direction;
+    }
+  } /* namespace */
+
+
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void
+  InitialValues<HyperbolicDescription, dim, Number>::parse_parameters_callback()
+  {
+    AssertThrow(initial_direction_.norm() != 0.,
+                ExcMessage("Initial direction is set to the zero vector."));
+    initial_direction_ /= initial_direction_.norm();
+
+    {
+      bool initialized = false;
+      for (auto &it : initial_state_list_)
+        if (it->name() == configuration_) {
+          initial_state_ = [this, &it](const dealii::Point<dim> &point,
+                                       Number t) {
+            const auto transformed_point =
+                affine_transform(initial_direction_, initial_position_, point);
+            auto state = it->compute(transformed_point, t);
+            const auto view = hyperbolic_system_->template view<dim, Number>();
+            state =
+                view.apply_galilei_transform(state, [&](const auto &momentum) {
+                  return affine_transform_vector(initial_direction_, momentum);
+                });
+            return state;
+          };
+
+          initial_precomputed_ = [this, &it](const dealii::Point<dim> &point) {
+            const auto transformed_point =
+                affine_transform(initial_direction_, initial_position_, point);
+            return it->initial_precomputations(transformed_point);
+          };
+
+          initialized = true;
+          break;
+        }
+
+      AssertThrow(
+          initialized,
+          ExcMessage(
+              "Could not find an initial state description with name \"" +
+              configuration_ + "\""));
+    }
+
+    if (perturbation_ != 0.) {
+      initial_state_ = [old_state = this->initial_state_,
+                        perturbation = this->perturbation_](
+                           const dealii::Point<dim> &point, Number t) {
+        auto state = old_state(point, t);
+
+        if (t > 0.)
+          return state;
+
+        static std::default_random_engine generator =
+            std::default_random_engine(std::random_device()());
+        static std::uniform_real_distribution<Number> distribution(-1., 1.);
+        static auto draw = std::bind(distribution, generator);
+        for (unsigned int i = 0; i < problem_dimension; ++i)
+          state[i] *= (Number(1.) + perturbation * draw());
+
+        return state;
+      };
+    }
+  }
+
+
+  template <typename HyperbolicDescription, int dim, typename Number>
+  auto InitialValues<HyperbolicDescription, dim, Number>::
+      interpolate_hyperbolic_vector(Number t) const -> HyperbolicVector
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "InitialValues<dim, Number>::"
+              << "interpolate_hyperbolic_vector(t = " << t << ")" << std::endl;
+#endif
+
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    const auto &vector_partitioner =
+        offline_data_->hyperbolic_vector_partitioner();
+
+    HyperbolicVector U;
+    U.reinit_with_vector_partitioner(vector_partitioner, problem_dimension);
+
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    ScalarHostVector temp;
+    temp.reinit(scalar_partitioner);
+
+    const auto U_view = U.template view<problem_dimension>();
+    const auto callable = [&](const auto &p) { return initial_state(p, t); };
+    for (unsigned int d = 0; d < problem_dimension; ++d) {
+      VectorTools::interpolate(offline_data_->discretization().mapping(),
+                               offline_data_->dof_handler(),
+                               to_function<dim, Number>(callable, d),
+                               temp);
+      U_view.insert_component(temp, d);
+    }
+
+    U_view.update_ghost_values();
+
+    return U;
+  }
+
+
+  template <typename HyperbolicDescription, int dim, typename Number>
+  auto InitialValues<HyperbolicDescription, dim, Number>::
+      interpolate_initial_precomputed_vector() const -> InitialPrecomputedVector
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "InitialValues<dim, Number>::"
+              << "interpolate_initial_precomputed_vector()" << std::endl;
+#endif
+
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+
+    InitialPrecomputedVector precomputed;
+    precomputed.reinit_with_scalar_partitioner(scalar_partitioner,
+                                               n_initial_precomputed_values);
+
+    if constexpr (n_initial_precomputed_values == 0)
+      return precomputed;
+
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    ScalarHostVector temp;
+    temp.reinit(scalar_partitioner);
+
+    const auto precomputed_view =
+        precomputed.template view<n_initial_precomputed_values>();
+    const auto callable = [&](const auto &p) { return initial_precomputed(p); };
+    for (unsigned int d = 0; d < n_initial_precomputed_values; ++d) {
+      VectorTools::interpolate(offline_data_->dof_handler(),
+                               to_function<dim, Number>(callable, d),
+                               temp);
+      precomputed_view.insert_component(temp, d);
+    }
+
+    precomputed_view.update_ghost_values();
+    return precomputed;
+  }
+
+} /* namespace ryujin */

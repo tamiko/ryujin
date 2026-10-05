@@ -1,0 +1,30 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2020 - 2026 by the ryujin authors
+//
+
+#pragma once
+
+#define NUMBER @NUMBER@
+
+#cmakedefine DEBUG_OUTPUT
+#cmakedefine DEBUG_EXPENSIVE_BOUNDS_CHECK
+#cmakedefine DEBUG_SYMMETRY_CHECK
+
+#cmakedefine DENORMALS_ARE_ZERO
+
+#cmakedefine WITH_DEAL_II_THREADS
+#cmakedefine WITH_EOSPAC
+#cmakedefine WITH_GDAL
+#cmakedefine WITH_LIKWID
+#cmakedefine WITH_NVTX
+#cmakedefine WITH_OPENMP
+
+#cmakedefine BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
+
+#include <deal.II/base/config.h>
+#ifdef DEAL_II_WITH_MAGIC_ENUM
+#undef DEAL_II_WITH_MAGIC_ENUM
+#endif
+
+@RYUJIN_EQUATION_DEFINITIONS@

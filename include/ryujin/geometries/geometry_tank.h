@@ -1,0 +1,146 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2024 - 2025 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/base/compile_time_options.h>
+
+#include <ryujin/geometries/geometry_common_includes.h>
+
+namespace ryujin
+{
+  namespace GridGenerator
+  {
+    template <int dim, int spacedim, template <int, int> class Triangulation>
+    void wavetank(Triangulation<dim, spacedim> &,
+                  const double,
+                  const double,
+                  const double,
+                  const double)
+    {
+      AssertThrow(false, dealii::ExcNotImplemented());
+      __builtin_trap();
+    }
+
+
+#ifndef DOXYGEN
+    template <template <int, int> class Triangulation>
+    void wavetank(Triangulation<2, 2> &triangulation,
+                  const double reservoir_length,
+                  const double reservoir_width,
+                  const double flume_length,
+                  const double flume_width)
+    {
+      using namespace dealii;
+
+      dealii::Triangulation<2, 2> res1, res2, res3, flume, final;
+
+      const double tolerance = 1.e-8;
+
+      Assert(reservoir_width - flume_width > tolerance,
+             dealii::ExcInternalError());
+
+      const double diff = (reservoir_width - flume_width) / 2.;
+      unsigned int sub_x = int(std::round(reservoir_length * 100.));
+      unsigned int sub_y = int(std::round(diff * 100.));
+
+      GridGenerator::subdivided_hyper_rectangle(
+          res1,
+          {sub_x, sub_y},
+          Point<2>(-reservoir_length, -reservoir_width / 2.),
+          Point<2>(0, -flume_width / 2.));
+
+      GridGenerator::subdivided_hyper_rectangle(
+          res3,
+          {sub_x, sub_y},
+          Point<2>(-reservoir_length, flume_width / 2.),
+          Point<2>(0, reservoir_width / 2.));
+
+      sub_y = int(std::round(flume_width * 100.));
+
+      GridGenerator::subdivided_hyper_rectangle(
+          res2,
+          {sub_x, sub_y},
+          Point<2>(-reservoir_length, -flume_width / 2.),
+          Point<2>(0, flume_width / 2.));
+
+      sub_x = int(std::round(flume_length * 100.));
+
+      GridGenerator::subdivided_hyper_rectangle(
+          flume,
+          {sub_x, sub_y},
+          Point<2>(0., -flume_width / 2.),
+          Point<2>(flume_length, flume_width / 2.));
+
+      final.set_mesh_smoothing(triangulation.get_mesh_smoothing());
+      GridGenerator::merge_triangulations(
+          {&res1, &res2, &res3, &flume}, final, tolerance);
+      triangulation.copy_triangulation(final);
+
+      for (auto cell : triangulation.active_cell_iterators()) {
+        for (auto f : cell->face_indices()) {
+          const auto face = cell->face(f);
+
+          if (!face->at_boundary())
+            continue;
+
+          face->set_boundary_id(Boundary::slip);
+
+          const auto center = face->center();
+          if (center[0] > flume_length - tolerance)
+            face->set_boundary_id(Boundary::dynamic);
+        }
+      }
+    }
+#endif
+  } /* namespace GridGenerator */
+
+
+  namespace Geometries
+  {
+    template <int dim>
+    class WaveTank : public Geometry<dim>
+    {
+    public:
+      WaveTank(const std::string &subsection)
+          : Geometry<dim>("wave tank", subsection)
+      {
+        reservoir_length_ = 157. / 100.;
+        this->add_parameter("reservoir length",
+                            reservoir_length_,
+                            "length of water reservoir [meters]");
+
+        reservoir_width_ = 81 / 100.;
+        this->add_parameter("reservoir width",
+                            reservoir_width_,
+                            "width of water reservoir [meters]");
+
+        flume_length_ = 600.78 / 100.;
+        this->add_parameter(
+            "flume length", flume_length_, "length of flume [meters]");
+
+        flume_width_ = 24 / 100.;
+        this->add_parameter(
+            "flume width", flume_width_, "width of flume [meters]");
+      }
+
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
+      {
+        GridGenerator::wavetank(triangulation,
+                                reservoir_length_,
+                                reservoir_width_,
+                                flume_length_,
+                                flume_width_);
+      }
+
+    private:
+      double reservoir_length_;
+      double reservoir_width_;
+      double flume_length_;
+      double flume_width_;
+    };
+  } /* namespace Geometries */
+} /* namespace ryujin */

@@ -1,0 +1,22 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/interface/parabolic_system.h>
+
+#include <concepts>
+#include <string>
+
+namespace ryujin
+{
+  namespace Concept
+  {
+    template <typename T>
+    concept ParabolicSystem =
+        std::derived_from<T, Interface::ParabolicSystem> &&
+        std::constructible_from<T, const std::string &>;
+  } // namespace Concept
+} // namespace ryujin
