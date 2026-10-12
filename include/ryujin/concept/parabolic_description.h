@@ -15,8 +15,11 @@ namespace ryujin
 {
   class MPIEnsemble;
 
-  template <int dim, typename Number>
-  class OfflineData;
+  namespace Interface
+  {
+    template <int dim, typename Number>
+    class OfflineData;
+  } // namespace Interface
 
   template <typename HyperbolicDescription, int dim, typename Number>
   class InitialValues;
@@ -32,7 +35,7 @@ namespace ryujin
         std::constructible_from<
             typename T::template ParabolicModule<HD, dim, Number>,
             const MPIEnsemble &,
-            const OfflineData<dim, Number> &,
+            const Interface::OfflineData<dim, Number> &,
             const typename HD::HyperbolicSystem &,
             const typename T::ParabolicSystem &,
             const InitialValues<HD, dim, Number> &,

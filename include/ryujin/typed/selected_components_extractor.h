@@ -10,7 +10,7 @@
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/selected_components_extractor.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
@@ -55,7 +55,7 @@ namespace ryujin
         initial_offset + View::n_initial_precomputed_values;
 
     SelectedComponentsExtractor(
-        const OfflineData<dim, Number> &offline_data,
+        const Interface::OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const Interface::ParabolicSystem &parabolic_system,
         const InitialPrecomputedVector &initial_precomputed,
@@ -87,7 +87,8 @@ namespace ryujin
     view() const;
 
   private:
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
 
@@ -160,10 +161,10 @@ namespace ryujin
     };
 
     SelectedComponentsExtractorView(
-        const OfflineData<dim, Number> &offline_data,
+        const Interface::OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system);
 
-    const OfflineData<dim, Number> *offline_data_;
+    const Interface::OfflineData<dim, Number> *offline_data_;
 
     bool read_conserved_ = false;
     bool read_primitive_ = false;

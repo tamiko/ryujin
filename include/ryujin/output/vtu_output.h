@@ -9,7 +9,7 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/selected_components_extractor.h>
 #include <ryujin/output/postprocessor.h>
 
@@ -26,7 +26,7 @@ namespace ryujin
     using StateVector = Vectors::StateVector<Number>;
 
     VTUOutput(const MPIEnsemble &mpi_ensemble,
-              const OfflineData<dim, Number> &offline_data,
+              const Interface::OfflineData<dim, Number> &offline_data,
               Interface::SelectedComponentsExtractor<dim, Number> &extractor,
               const Postprocessor<dim, Number> &postprocessor,
 
@@ -50,7 +50,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const Postprocessor<dim, Number>> postprocessor_;
 
     Interface::SelectedComponentsExtractor<dim, Number>

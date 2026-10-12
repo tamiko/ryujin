@@ -17,7 +17,7 @@ namespace ryujin
   template <typename HyperbolicDescription, int dim, typename Number>
   SelectedComponentsExtractor<HyperbolicDescription, dim, Number>::
       SelectedComponentsExtractor(
-          const OfflineData<dim, Number> &offline_data,
+          const Interface::OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system,
           const Interface::ParabolicSystem &parabolic_system,
           const InitialPrecomputedVector &initial_precomputed,
@@ -204,7 +204,7 @@ namespace ryujin
                                   Number,
                                   MemorySpace>::
       SelectedComponentsExtractorView(
-          const OfflineData<dim, Number> &offline_data,
+          const Interface::OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system)
       : offline_data_(&offline_data)
       , system_views_(hyperbolic_system)

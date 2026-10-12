@@ -9,9 +9,9 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/typed/initial_state_library.h>
-#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/initial_values.h>
+#include <ryujin/interface/offline_data.h>
+#include <ryujin/typed/initial_state_library.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -42,7 +42,7 @@ namespace ryujin
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
 
     InitialValues(const MPIEnsemble &mpi_ensemble,
-                  const OfflineData<dim, Number> &offline_data,
+                  const Interface::OfflineData<dim, Number> &offline_data,
                   const HyperbolicSystem &hyperbolic_system,
                   const std::string &subsection = "/InitialValues");
 
@@ -75,7 +75,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
 

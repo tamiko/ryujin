@@ -44,7 +44,8 @@ namespace ryujin
 
       typename Geometry<dim>::HP_Collection populate_hp_collections(
           const unsigned int,
-          typename ryujin::Discretization<dim>::Collection &) const override
+          typename ryujin::Interface::Discretization<dim>::Collection &)
+          const override
       {
         if (use_simplices_) {
           return Geometry<dim>::HP_Collection::standard_simplices;

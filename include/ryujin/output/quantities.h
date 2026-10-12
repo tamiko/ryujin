@@ -10,7 +10,7 @@
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/selected_components_extractor.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -26,7 +26,7 @@ namespace ryujin
     using StateVector = Vectors::StateVector<Number>;
 
     Quantities(const MPIEnsemble &mpi_ensemble,
-               const OfflineData<dim, Number> &offline_data,
+               const Interface::OfflineData<dim, Number> &offline_data,
                Interface::SelectedComponentsExtractor<dim, Number> &extractor,
                const std::string &subsection = "/Quantities");
 
@@ -40,7 +40,7 @@ namespace ryujin
 
   private:
     using ManifoldPoint =
-        typename OfflineData<dim, Number>::BoundaryDescription;
+        typename Interface::OfflineData<dim, Number>::BoundaryDescription;
 
     struct Manifold {
       std::string name;
@@ -80,7 +80,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
 
     Interface::SelectedComponentsExtractor<dim, Number> &extractor_;
 

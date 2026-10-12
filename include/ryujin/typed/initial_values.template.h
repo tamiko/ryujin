@@ -20,7 +20,7 @@ namespace ryujin
   template <typename HyperbolicDescription, int dim, typename Number>
   InitialValues<HyperbolicDescription, dim, Number>::InitialValues(
       const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const std::string &subsection)
       : Interface::InitialValues<dim, Number>(subsection)

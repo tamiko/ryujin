@@ -9,7 +9,7 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/solution_transfer.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
@@ -44,7 +44,7 @@ namespace ryujin
     using HyperbolicVector = typename View::HyperbolicVector;
 
     SolutionTransfer(const MPIEnsemble &mpi_ensemble,
-                     const OfflineData<dim, Number> &offline_data,
+                     const Interface::OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection = "/SolutionTransfer");
 
@@ -59,7 +59,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
 

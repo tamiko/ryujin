@@ -6,29 +6,21 @@
 #pragma once
 
 #include <ryujin/base/convenience_macros.h>
+#include <ryujin/interface/discretization.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/initial_values.h>
+#include <ryujin/interface/mesh_adaptor.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/interface/solution_transfer.h>
+#include <ryujin/interface/time_integrator.h>
 
 #include <memory>
 
 namespace ryujin
 {
   class MPIEnsemble;
-
-  template <int dim>
-  class Discretization;
-
-  template <int dim, typename Number>
-  class OfflineData;
-
-  template <int dim, typename Number>
-  class TimeIntegrator;
-
-  template <int dim, typename Number>
-  class MeshAdaptor;
 
   template <int dim, typename Number>
   class Postprocessor;

@@ -27,7 +27,7 @@ namespace ryujin
   template <typename HyperbolicDescription, int dim, typename Number>
   SolutionTransfer<HyperbolicDescription, dim, Number>::SolutionTransfer(
       const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const std::string &subsection)
       : Interface::SolutionTransfer<dim, Number>(subsection)

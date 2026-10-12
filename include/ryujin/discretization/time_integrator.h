@@ -11,10 +11,11 @@
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/patterns_conversion.h>
-#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_module.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/interface/parabolic_system.h>
+#include <ryujin/interface/time_integrator.h>
 
 #include <numbers>
 
@@ -84,30 +85,31 @@ DECLARE_ENUM(
 namespace ryujin
 {
   template <int dim, typename Number = double>
-  class TimeIntegrator final : public dealii::ParameterAcceptor
+  class TimeIntegrator final : public Interface::TimeIntegrator<dim, Number>
   {
   public:
-    using StateVector = Vectors::StateVector<Number>;
+    using typename Interface::TimeIntegrator<dim, Number>::StateVector;
 
     TimeIntegrator(
         const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
+        const Interface::OfflineData<dim, Number> &offline_data,
         const Interface::HyperbolicModule<dim, Number> &hyperbolic_module,
         const Interface::ParabolicModule<dim, Number> &parabolic_module,
         const Interface::ParabolicSystem &parabolic_system,
         const std::string &subsection = "/TimeIntegrator");
 
-    void prepare();
+    void prepare() override;
 
-    void prepare_state_vector(StateVector &state_vector, Number t) const;
+    void prepare_state_vector(StateVector &state_vector,
+                              Number t) const override;
 
     Number step(StateVector &state_vector,
                 Number t,
-                Number t_final = std::numeric_limits<Number>::max());
+                Number t_final = std::numeric_limits<Number>::max()) override;
+
+    std::string time_stepping_scheme_name() const override;
 
     ACCESSOR_READ_ONLY(time_stepping_scheme);
-
-    ACCESSOR_READ_ONLY(efficiency);
 
   private:
     Number cfl_min_;
@@ -119,11 +121,11 @@ namespace ryujin
     Number tau_max_;
 
     TimeSteppingScheme time_stepping_scheme_;
-    Number efficiency_;
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const Interface::HyperbolicModule<dim, Number>>
         hyperbolic_module_;
     dealii::ObserverPointer<const Interface::ParabolicModule<dim, Number>>

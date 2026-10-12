@@ -21,11 +21,6 @@
 
 namespace ryujin
 {
-#ifndef DOXYGEN
-  template <int dim, typename Number>
-  class OfflineData;
-#endif
-
   namespace Vectors
   {
     template <typename Number>

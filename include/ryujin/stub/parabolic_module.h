@@ -7,10 +7,10 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
-#include <ryujin/typed/initial_values.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/stub/parabolic_system.h>
+#include <ryujin/typed/initial_values.h>
 
 #include <ostream>
 #include <string>
@@ -28,7 +28,7 @@ namespace ryujin
 
     StubParabolicModule(
         const MPIEnsemble &,
-        const OfflineData<dim, Number> &,
+        const Interface::OfflineData<dim, Number> &,
         const HyperbolicSystem &,
         const StubParabolicSystem &,
         const InitialValues<HyperbolicDescription, dim, Number> &,

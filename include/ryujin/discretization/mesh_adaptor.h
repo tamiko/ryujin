@@ -9,10 +9,9 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/mesh_adaptor.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/selected_components_extractor.h>
-
-#include <deal.II/base/parameter_acceptor.h>
 
 #include <random>
 
@@ -59,34 +58,29 @@ DECLARE_ENUM(ryujin::TimePointSelectionStrategy,
 namespace ryujin
 {
   template <int dim, typename Number = double>
-  class MeshAdaptor final : public dealii::ParameterAcceptor
+  class MeshAdaptor final : public Interface::MeshAdaptor<dim, Number>
   {
   public:
-    using StateVector = Vectors::StateVector<Number>;
-    using ScalarVector = Vectors::ScalarVector<Number>;
+    using typename Interface::MeshAdaptor<dim, Number>::StateVector;
+    using typename Interface::MeshAdaptor<dim, Number>::ScalarVector;
 
     MeshAdaptor(const MPIEnsemble &mpi_ensemble,
-                const OfflineData<dim, Number> &offline_data,
+                const Interface::OfflineData<dim, Number> &offline_data,
                 Interface::SelectedComponentsExtractor<dim, Number> &extractor,
 
                 const std::string &subsection = "/MeshAdaptor");
 
-    void prepare(const Number t);
+    void prepare(const Number t) override;
 
     void analyze(const StateVector &state_vector,
                  const Number t,
-                 unsigned int cycle);
+                 unsigned int cycle) override;
 
     void mark_cells_for_coarsening_and_refinement(
-        dealii::Triangulation<dim> &triangulation) const;
+        dealii::Triangulation<dim> &triangulation) const override;
 
-    void compute_smoothness_indicators(const StateVector &state_vector) const;
-
-    ACCESSOR_READ_ONLY(need_mesh_adaptation)
-
-    ACCESSOR_READ_ONLY(indicators);
-
-    ACCESSOR_READ_ONLY(smoothness_indicators);
+    void compute_smoothness_indicators(
+        const StateVector &state_vector) const override;
 
   private:
     AdaptationStrategy adaptation_strategy_;
@@ -111,18 +105,13 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
 
     Interface::SelectedComponentsExtractor<dim, Number>
         &selected_components_extractor_;
 
-    bool need_mesh_adaptation_;
-
-    mutable dealii::Vector<float> indicators_;
-
     mutable std::mt19937_64 mersenne_twister_;
-
-    mutable ScalarVector smoothness_indicators_;
 
     void populate_cell_indicators_with_random_values() const;
 

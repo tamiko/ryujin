@@ -19,8 +19,11 @@
 namespace ryujin
 {
 #ifndef DOXYGEN
-  template <int dim>
-  class Discretization;
+  namespace Interface
+  {
+    template <int dim>
+    class Discretization;
+  } // namespace Interface
 #endif
 
   template <int dim>
@@ -46,7 +49,7 @@ namespace ryujin
 
     virtual HP_Collection populate_hp_collections(
         const unsigned int,
-        typename ryujin::Discretization<dim>::Collection &) const
+        typename ryujin::Interface::Discretization<dim>::Collection &) const
     {
       return HP_Collection::standard_quadrilaterals;
     }

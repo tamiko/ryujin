@@ -17,8 +17,11 @@
 
 namespace ryujin
 {
-  template <int dim, typename Number>
-  class OfflineData;
+  namespace Interface
+  {
+    template <int dim, typename Number>
+    class OfflineData;
+  } // namespace Interface
 
 
   namespace Concept
@@ -125,7 +128,8 @@ namespace ryujin
         HyperbolicSystemView<view_type<T, dim, Number>, dim, Number> &&
         requires(
             const T &system,
-            const OfflineData<dim, typename get_value_type<Number>::type>
+            const Interface::OfflineData<dim,
+                                         typename get_value_type<Number>::type>
                 &offline_data,
             typename view_type<T, dim, Number>::StateVector &state_vector) {
           { T::problem_name } -> std::convertible_to<std::string>;

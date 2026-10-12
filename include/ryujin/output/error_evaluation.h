@@ -9,7 +9,7 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/selected_components_extractor.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -29,7 +29,7 @@ namespace ryujin
 
     ErrorEvaluation(
         const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
+        const Interface::OfflineData<dim, Number> &offline_data,
         Interface::SelectedComponentsExtractor<dim, Number> &extractor,
         const std::string &subsection = "/ErrorEvaluation");
 
@@ -56,7 +56,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
 
     Interface::SelectedComponentsExtractor<dim, Number>
         &selected_components_extractor_;

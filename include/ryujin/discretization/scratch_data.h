@@ -7,7 +7,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 
-#include <ryujin/discretization/discretization.h>
+#include <ryujin/interface/discretization.h>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/hp/fe_values.h>
@@ -25,7 +25,7 @@ namespace ryujin
     }
 
 
-    AssemblyScratchData(const Discretization<dim> &discretization)
+    AssemblyScratchData(const Interface::Discretization<dim> &discretization)
         : discretization_(discretization)
         , hp_fe_values_(discretization_.mapping(),
                         discretization_.finite_element(),
@@ -56,7 +56,7 @@ namespace ryujin
     {
     }
 
-    const Discretization<dim> &discretization_;
+    const Interface::Discretization<dim> &discretization_;
 
     dealii::hp::FEValues<dim> hp_fe_values_;
     dealii::hp::FEFaceValues<dim> hp_fe_face_values_;
