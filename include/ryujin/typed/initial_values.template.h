@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <ryujin/dependent/initial_values.h>
+#include <ryujin/typed/initial_values.h>
 
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>

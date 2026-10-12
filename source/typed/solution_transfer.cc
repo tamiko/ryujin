@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2026 by the ryujin authors
+// Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
 // Built once per hyperbolic description. The build defines
@@ -9,15 +9,13 @@
 
 #include RYUJIN_DESCRIPTION_HEADER
 
-#include <ryujin/dependent/hyperbolic_module.template.h>
+#include <ryujin/typed/solution_transfer.template.h>
 
 namespace ryujin
 {
   using HD = RYUJIN_HYPERBOLIC_DESCRIPTION;
 
-  template class HyperbolicModule<HD, 1, NUMBER>;
-  template class HyperbolicModule<HD, 2, NUMBER>;
-  template class HyperbolicModule<HD, 3, NUMBER>;
-
-  /* step<stages> for stages = 0, ..., 4: as before. */
+  template class SolutionTransfer<HD, 1, NUMBER>;
+  template class SolutionTransfer<HD, 2, NUMBER>;
+  template class SolutionTransfer<HD, 3, NUMBER>;
 } // namespace ryujin

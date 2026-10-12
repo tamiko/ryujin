@@ -6,7 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
-#include <ryujin/dependent/solution_transfer.h>
+#include <ryujin/typed/solution_transfer.h>
 #include <ryujin/discretization/tensor_product_point_kernels.h>
 
 #include <deal.II/base/exceptions.h>

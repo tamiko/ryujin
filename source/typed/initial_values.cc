@@ -9,7 +9,7 @@
 
 #include RYUJIN_DESCRIPTION_HEADER
 
-#include <ryujin/dependent/initial_values.template.h>
+#include <ryujin/typed/initial_values.template.h>
 
 namespace ryujin
 {

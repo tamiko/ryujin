@@ -10,7 +10,7 @@
 #include <ryujin/base/loop.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/simd.h>
-#include <ryujin/dependent/hyperbolic_module.h>
+#include <ryujin/typed/hyperbolic_module.h>
 
 #include <array>
 #include <format>

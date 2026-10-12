@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2024 - 2026 by the ryujin authors
+// Copyright (C) 2026 by the ryujin authors
 //
 
 // Built once per hyperbolic description. The build defines
@@ -9,13 +9,13 @@
 
 #include RYUJIN_DESCRIPTION_HEADER
 
-#include <ryujin/dependent/solution_transfer.template.h>
+#include <ryujin/typed/selected_components_extractor.template.h>
 
 namespace ryujin
 {
   using HD = RYUJIN_HYPERBOLIC_DESCRIPTION;
 
-  template class SolutionTransfer<HD, 1, NUMBER>;
-  template class SolutionTransfer<HD, 2, NUMBER>;
-  template class SolutionTransfer<HD, 3, NUMBER>;
+  template class SelectedComponentsExtractor<HD, 1, NUMBER>;
+  template class SelectedComponentsExtractor<HD, 2, NUMBER>;
+  template class SelectedComponentsExtractor<HD, 3, NUMBER>;
 } // namespace ryujin

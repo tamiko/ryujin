@@ -10,10 +10,10 @@
 #include <ryujin/base/mpi_ensemble_container.h>
 #include <ryujin/concept/hyperbolic_description.h>
 #include <ryujin/concept/parabolic_description.h>
-#include <ryujin/dependent/hyperbolic_module.h>
-#include <ryujin/dependent/initial_values.h>
-#include <ryujin/dependent/selected_components_extractor.h>
-#include <ryujin/dependent/solution_transfer.h>
+#include <ryujin/typed/hyperbolic_module.h>
+#include <ryujin/typed/initial_values.h>
+#include <ryujin/typed/selected_components_extractor.h>
+#include <ryujin/typed/solution_transfer.h>
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/discretization/mesh_adaptor.h>
 #include <ryujin/discretization/offline_data.h>

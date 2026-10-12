@@ -9,7 +9,7 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/dependent/initial_state_library.h>
+#include <ryujin/typed/initial_state_library.h>
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/initial_values.h>
 

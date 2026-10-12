@@ -10,7 +10,7 @@
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/dependent/initial_values.h>
+#include <ryujin/typed/initial_values.h>
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>

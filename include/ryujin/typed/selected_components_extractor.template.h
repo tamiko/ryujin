@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <ryujin/dependent/selected_components_extractor.h>
+#include <ryujin/typed/selected_components_extractor.h>
 
 #include <iterator>
 #include <string>

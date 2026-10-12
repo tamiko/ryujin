@@ -7,7 +7,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
-#include <ryujin/dependent/initial_values.h>
+#include <ryujin/typed/initial_values.h>
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/stub/parabolic_system.h>
