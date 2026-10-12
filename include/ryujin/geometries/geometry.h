@@ -30,6 +30,10 @@ namespace ryujin
   class Geometry : public dealii::ParameterAcceptor
   {
   public:
+    using Transformation = std::function<dealii::Point<dim>(
+        const typename dealii::Triangulation<dim>::cell_iterator &,
+        const dealii::Point<dim> &)>;
+
     Geometry(const std::string &name, const std::string &subsection)
         : ParameterAcceptor(subsection + "/" + name)
         , name_(name)
@@ -59,10 +63,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(name)
 
   protected:
-    mutable std::function<dealii::Point<dim>(
-        const typename dealii::Triangulation<dim>::cell_iterator &,
-        const dealii::Point<dim> &)>
-        transformation_;
+    mutable Transformation transformation_;
 
   private:
     const std::string name_;

@@ -108,9 +108,15 @@ namespace ryujin
             face_nodal_quadrature;
       };
 
+      using Transformation = typename Geometry<dim>::Transformation;
+
       virtual void prepare(const std::string &base_name) = 0;
 
       virtual void update_mapping() = 0;
+
+      ACCESSOR(transformation)
+
+      ACCESSOR_READ_ONLY(transformation)
 
       ACCESSOR_READ_ONLY(selected_geometry)
 
@@ -204,6 +210,8 @@ namespace ryujin
 
       Collection collection_;
       std::shared_ptr<dealii::MappingQCache<dim>> mapping_cache_;
+
+      Transformation transformation_;
 
       std::shared_ptr<Geometry<dim>> selected_geometry_;
 

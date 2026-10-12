@@ -6,13 +6,11 @@
 #pragma once
 
 #include <ryujin/base/convenience_macros.h>
+#include <ryujin/interface/discretization.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/tria.h>
-#include <deal.II/lac/vector.h>
-
-#include <memory>
 
 namespace ryujin
 {
@@ -23,7 +21,7 @@ namespace ryujin
     {
     public:
       using StateVector = Vectors::StateVector<Number>;
-      using ScalarVector = Vectors::ScalarVector<Number>;
+      using Transformation = typename Discretization<dim>::Transformation;
 
       virtual void prepare(const Number t) = 0;
 
@@ -35,22 +33,14 @@ namespace ryujin
           dealii::Triangulation<dim> &triangulation) const = 0;
 
       virtual void
-      compute_smoothness_indicators(const StateVector &state_vector) const = 0;
+      update_transformation(Transformation &transformation) const = 0;
 
       ACCESSOR_READ_ONLY(need_mesh_adaptation)
-
-      ACCESSOR_READ_ONLY(indicators);
-
-      ACCESSOR_READ_ONLY(smoothness_indicators);
 
     protected:
       using ParameterAcceptor::ParameterAcceptor;
 
-      bool need_mesh_adaptation_;
-
-      std::unique_ptr<dealii::Vector<float>> indicators_;
-
-      std::unique_ptr<ScalarVector> smoothness_indicators_;
+      bool need_mesh_adaptation_ = false;
     };
   } // namespace Interface
 } // namespace ryujin

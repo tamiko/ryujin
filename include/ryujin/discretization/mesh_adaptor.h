@@ -13,6 +13,8 @@
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/selected_components_extractor.h>
 
+#include <deal.II/lac/vector.h>
+
 #include <random>
 
 namespace ryujin
@@ -62,12 +64,12 @@ namespace ryujin
   {
   public:
     using typename Interface::MeshAdaptor<dim, Number>::StateVector;
-    using typename Interface::MeshAdaptor<dim, Number>::ScalarVector;
+    using typename Interface::MeshAdaptor<dim, Number>::Transformation;
+    using ScalarVector = Vectors::ScalarVector<Number>;
 
     MeshAdaptor(const MPIEnsemble &mpi_ensemble,
                 const Interface::OfflineData<dim, Number> &offline_data,
                 Interface::SelectedComponentsExtractor<dim, Number> &extractor,
-
                 const std::string &subsection = "/MeshAdaptor");
 
     void prepare(const Number t) override;
@@ -79,8 +81,10 @@ namespace ryujin
     void mark_cells_for_coarsening_and_refinement(
         dealii::Triangulation<dim> &triangulation) const override;
 
-    void compute_smoothness_indicators(
-        const StateVector &state_vector) const override;
+    void
+    update_transformation(Transformation & /*transformation*/) const override
+    {
+    }
 
   private:
     AdaptationStrategy adaptation_strategy_;
@@ -111,9 +115,15 @@ namespace ryujin
     Interface::SelectedComponentsExtractor<dim, Number>
         &selected_components_extractor_;
 
+    mutable dealii::Vector<float> indicators_;
+
     mutable std::mt19937_64 mersenne_twister_;
 
+    mutable ScalarVector smoothness_indicators_;
+
     void populate_cell_indicators_with_random_values() const;
+
+    void compute_smoothness_indicators(const StateVector &state_vector) const;
 
     void populate_cell_indicators_from_smoothness_indicators() const;
   };

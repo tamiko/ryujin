@@ -161,14 +161,13 @@ namespace ryujin
           *postprocessor_extractor_,
           "/J - VTUOutput");
 
-      vtu_output_extractor_ = std::make_unique<Extractor>(
-          offline_data,
-          hyperbolic_system,
-          parabolic_system,
-          initial_precomputed,
-          AdditionalNames{"alpha", "smoothness_indicators"},
-          AdditionalVectors{alpha,
-                            this->mesh_adaptor_->smoothness_indicators()});
+      vtu_output_extractor_ =
+          std::make_unique<Extractor>(offline_data,
+                                      hyperbolic_system,
+                                      parabolic_system,
+                                      initial_precomputed,
+                                      AdditionalNames{"alpha"},
+                                      AdditionalVectors{alpha});
 
       this->vtu_output_ =
           std::make_unique<VTUOutput<dim, Number>>(mpi_ensemble,
