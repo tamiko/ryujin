@@ -17,7 +17,7 @@
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/discretization/mesh_adaptor.h>
 #include <ryujin/discretization/offline_data.h>
-#include <ryujin/driver/time_integrator.h>
+#include <ryujin/discretization/time_integrator.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/output/error_evaluation.h>
 #include <ryujin/output/postprocessor.h>
