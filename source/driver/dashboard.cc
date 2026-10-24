@@ -494,11 +494,11 @@ namespace ryujin
      */
 
     Elements information = {
-        hbox({label("Hyperbolic"), text(data.hyperbolic_name) | bold}),
+        hbox({label("hyperbolic"), text(data.hyperbolic_name) | bold}),
     };
     if (!data.parabolic_name.empty())
       information.push_back(
-          hbox({label("Parabolic"), text(data.parabolic_name) | bold}));
+          hbox({label("parabolic"), text(data.parabolic_name) | bold}));
 
     std::string ranks =
         std::format("{} rank{}", data.n_ranks, data.n_ranks == 1 ? "" : "s");
