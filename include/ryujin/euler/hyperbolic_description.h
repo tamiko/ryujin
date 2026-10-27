@@ -27,7 +27,7 @@ namespace ryujin
      * @ingroup EulerEquations
      */
     struct HyperbolicDescription {
-      using HyperbolicSystem = Euler::HyperbolicSystem;
+      using HyperbolicSystem = Euler::HyperbolicSystem<>;
 
       template <int dim, typename Number>
       using InitialValues =

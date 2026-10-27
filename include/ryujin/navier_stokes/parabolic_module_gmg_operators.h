@@ -29,7 +29,7 @@ namespace ryujin
 {
   namespace NavierStokes
   {
-    using HyperbolicSystem = Euler::HyperbolicSystem;
+    using HyperbolicSystem = Euler::HyperbolicSystem<>;
 
     /**
      * A diagonal matrix used as a preconditioner for the non-multigrid CG

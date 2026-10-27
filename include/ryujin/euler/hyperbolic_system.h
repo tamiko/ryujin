@@ -28,7 +28,8 @@ namespace ryujin
   {
     template <int dim,
               typename Number,
-              typename MemorySpace = dealii::MemorySpace::Host>
+              typename MemorySpace = dealii::MemorySpace::Host,
+              unsigned int n_passive = 0>
     class HyperbolicSystemView;
 
     /**
@@ -39,8 +40,17 @@ namespace ryujin
      * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
      * momentum, and \f$E\f$ is the total energy.
      *
+     * The state can be augmented by @p n_passive components \f$q_k\f$
+     * that are passively advected with the flow,
+     * \f$\partial_t q_k + \nabla\cdot(\textbf v q_k) = 0\f$. The
+     * passive components are appended to the state, i.e., the state space
+     * is (2 + dim + n_passive) dimensional. The primitive value of a
+     * passive component is \f$q_k\f$ itself. The passive components do
+     * not alter the maximal wave speed.
+     *
      * @ingroup EulerEquations
      */
+    template <unsigned int n_passive = 0>
     class HyperbolicSystem : public Interface::HyperbolicSystem
     {
     public:
@@ -81,9 +91,12 @@ namespace ryujin
       };
 
       /**
-       * Constructor.
+       * Constructor. The array @p passive_names holds the names of the
+       * passive components.
        */
-      HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
+      HyperbolicSystem(
+          const std::string &subsection = "/HyperbolicSystem",
+          const std::array<std::string, n_passive> &passive_names = {});
 
       /**
        * Alias for the view on the hyperbolic system for a given dimension @p
@@ -93,7 +106,7 @@ namespace ryujin
       template <int dim,
                 typename Number = double,
                 typename MemorySpace = dealii::MemorySpace::Host>
-      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace, n_passive>;
 
       /**
        * Return a view on the Hyperbolic System for a given dimension @p
@@ -140,7 +153,7 @@ namespace ryujin
 
       Mirrored<Parameters> parameters_;
 
-      template <int, typename, typename>
+      template <int, typename, typename, unsigned int>
       friend class HyperbolicSystemView;
 
       //@}
@@ -168,7 +181,10 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim,
+              typename Number,
+              typename MemorySpace,
+              unsigned int n_passive>
     class HyperbolicSystemView
     {
     public:
@@ -190,7 +206,7 @@ namespace ryujin
       /**
        * The dimension of the state space.
        */
-      static constexpr unsigned int problem_dimension = 2 + dim;
+      static constexpr unsigned int problem_dimension = 2 + dim + n_passive;
 
       /**
        * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
@@ -198,15 +214,23 @@ namespace ryujin
       using state_type = dealii::Tensor<1, problem_dimension, Number>;
 
       /**
-       * Storage type for the flux \f$\mathbf{f}\f$.
+       * Storage type for the flux \f$\mathbf{f}\f$ of the density, the
+       * momentum, and the total energy. The flux of the passive components
+       * is not stored.
        */
       using flux_type =
-          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+          dealii::Tensor<1, 2 + dim, dealii::Tensor<1, dim, Number>>;
 
       /**
-       * The storage type used for flux contributions.
+       * The storage type used for flux contributions: The flux
+       * \f$\mathbf{f}\f$ and the specific values \f$q_k/\rho\f$ of the
+       * passive components. The flux of a passive component is the density
+       * flux \f$\textbf m\f$ scaled by the specific value.
        */
-      using flux_contribution_type = flux_type;
+      struct flux_contribution_type {
+        flux_type f;
+        [[no_unique_address]] std::array<Number, n_passive> phi;
+      };
 
       /**
        * The number of precomputed values.
@@ -256,7 +280,7 @@ namespace ryujin
        * Constructor taking a reference to the underlying
        * HyperbolicSystem
        */
-      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+      HyperbolicSystemView(const HyperbolicSystem<n_passive> &hyperbolic_system)
           : parameters_(
                 hyperbolic_system.parameters_.template view<MemorySpace>())
       {
@@ -519,6 +543,7 @@ namespace ryujin
        *   \textbf v(E+p)
        * \end{pmatrix},
        * \f]
+       * The flux of the passive components is not computed.
        */
       DEAL_II_HOST_DEVICE flux_type f(const state_type &U) const;
 
@@ -539,7 +564,8 @@ namespace ryujin
        * }
        * ```
        *
-       * For the Euler equations we simply compute <code>f(U_i)</code>.
+       * For the Euler equations we simply compute <code>f(U_i)</code> and
+       * the specific values of the passive components.
        */
       DEAL_II_HOST_DEVICE
       flux_contribution_type
@@ -661,7 +687,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem::Parameters *const parameters_;
+      const typename HyperbolicSystem<n_passive>::Parameters *const parameters_;
 
       //@}
     }; /* HyperbolicSystemView */
@@ -673,15 +699,20 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
-    inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
+    template <unsigned int n_passive>
+    inline HyperbolicSystem<n_passive>::HyperbolicSystem(
+        const std::string &subsection,
+        const std::array<std::string, n_passive> &passive_names)
         : Interface::HyperbolicSystem(
               "Compressible Euler equations (polytropic gas EOS, optimized)",
-              {{{"rho", "m", "E"},
-                {"rho", "m_1", "m_2", "E"},
-                {"rho", "m_1", "m_2", "m_3", "E"}}},
-              {{{"rho", "v", "p"},
-                {"rho", "v_1", "v_2", "p"},
-                {"rho", "v_1", "v_2", "v_3", "p"}}},
+              append_names({{{"rho", "m", "E"},
+                             {"rho", "m_1", "m_2", "E"},
+                             {"rho", "m_1", "m_2", "m_3", "E"}}},
+                           passive_names),
+              append_names({{{"rho", "v", "p"},
+                             {"rho", "v_1", "v_2", "p"},
+                             {"rho", "v_1", "v_2", "v_3", "p"}}},
+                           passive_names),
               {{{"s", "eta_h"}, {"s", "eta_h"}, {"s", "eta_h"}}},
               {},
               subsection)
@@ -716,7 +747,8 @@ namespace ryujin
     }
 
 
-    inline void HyperbolicSystem::update_parameters()
+    template <unsigned int n_passive>
+    inline void HyperbolicSystem<n_passive>::update_parameters()
     {
       auto &parameters = *parameters_.view();
 
@@ -733,8 +765,9 @@ namespace ryujin
     }
 
 
+    template <unsigned int n_passive>
     template <typename MemorySpace, int dim, typename ScalarNumber>
-    inline void HyperbolicSystem::fill_precomputed_values(
+    inline void HyperbolicSystem<n_passive>::fill_precomputed_values(
         const OfflineData<dim, ScalarNumber> &offline_data,
         StateVector<ScalarNumber> &state_vector,
         const bool skip_constrained_dofs) const
@@ -742,7 +775,7 @@ namespace ryujin
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
 
-      using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
+      using ScalarView = View<dim, ScalarNumber>;
 
       const auto sparsity_simd_view =
           offline_data.sparsity_pattern_simd().template view<MemorySpace>();
@@ -761,8 +794,8 @@ namespace ryujin
 
       const auto body = [=](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
-        using View = HyperbolicSystemView<dim, T, MemorySpace>;
-        using precomputed_type = typename View::precomputed_type;
+        using precomputed_type =
+            typename View<dim, T, MemorySpace>::precomputed_type;
 
         const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (skip_constrained_dofs && row_length == 1)
@@ -781,17 +814,18 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::density(const state_type &U)
+    HyperbolicSystemView<dim, Number, MS, n_passive>::density(
+        const state_type &U)
     {
       return U[0];
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::filter_vacuum_density(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::filter_vacuum_density(
         const Number &rho) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
@@ -803,9 +837,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
-    HyperbolicSystemView<dim, Number, MemorySpace>::momentum(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::momentum(
         const state_type &U)
     {
       dealii::Tensor<1, dim, Number> result;
@@ -815,18 +849,18 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::total_energy(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::total_energy(
         const state_type &U)
     {
       return U[1 + dim];
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::internal_energy(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::internal_energy(
         const state_type &U)
     {
       /*
@@ -839,10 +873,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::internal_energy_derivative(
-        const state_type &U) -> state_type
+    HyperbolicSystemView<dim, Number, MS, n_passive>::
+        internal_energy_derivative(const state_type &U) -> state_type
     {
       /*
        * With
@@ -866,9 +900,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::pressure(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::pressure(
         const state_type &U) const
     {
       /* p = (gamma - 1) * (rho e) */
@@ -876,9 +910,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::speed_of_sound(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::speed_of_sound(
         const state_type &U) const
     {
       /* c^2 = gamma * p / rho */
@@ -888,9 +922,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::specific_entropy(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::specific_entropy(
         const state_type &U) const
     {
       /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
@@ -899,9 +933,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::harten_entropy(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::harten_entropy(
         const state_type &U) const
     {
       /* rho^2 e = \rho E - 1/2*m^2 */
@@ -915,9 +949,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::harten_entropy_derivative(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::harten_entropy_derivative(
         const state_type &U) const -> state_type
     {
       /*
@@ -952,9 +986,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    HyperbolicSystemView<dim, Number, MemorySpace>::mathematical_entropy(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::mathematical_entropy(
         const state_type &U) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -963,9 +997,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::
+    HyperbolicSystemView<dim, Number, MS, n_passive>::
         mathematical_entropy_derivative(const state_type &U) const -> state_type
     {
       /*
@@ -1000,9 +1034,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool
-    HyperbolicSystemView<dim, Number, MemorySpace>::is_admissible(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::is_admissible(
         const state_type &U) const
     {
       const auto rho_new = density(U);
@@ -1030,15 +1064,15 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     template <int component>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::linearized_eigenvector(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::linearized_eigenvector(
         const state_type &U, const dealii::Tensor<1, dim, Number> &normal) const
         -> std::array<state_type, 2>
     {
-      static_assert(component == 1 || component == problem_dimension,
-                    "Only first and last eigenvectors implemented");
+      static_assert(component == 1 || component == 2 + dim,
+                    "Only first and last acoustic eigenvectors implemented");
 
       const auto rho = density(U);
       const auto m = momentum(U);
@@ -1063,10 +1097,12 @@ namespace ryujin
         for (unsigned int i = 0; i < dim; ++i)
           c[1 + i] = v[i] - a * normal[i];
         c[dim + 1] = a * a / (gamma - 1) + e_k - a * (v * normal);
+        for (unsigned int k = 0; k < n_passive; ++k)
+          c[dim + 2 + k] = U[dim + 2 + k] / rho;
 
         return {b, c};
 
-      case problem_dimension:
+      case 2 + dim:
         b[0] = (gamma - 1.) * e_k - a * v * normal;
         for (unsigned int i = 0; i < dim; ++i)
           b[1 + i] = (1. - gamma) * v[i] + a * normal[i];
@@ -1077,6 +1113,8 @@ namespace ryujin
         for (unsigned int i = 0; i < dim; ++i)
           c[1 + i] = v[i] + a * normal[i];
         c[dim + 1] = a * a / (gamma - 1) + e_k + a * (v * normal);
+        for (unsigned int k = 0; k < n_passive; ++k)
+          c[dim + 2 + k] = U[dim + 2 + k] / rho;
 
         return {b, c};
       }
@@ -1085,10 +1123,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     template <int component>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::
+    HyperbolicSystemView<dim, Number, MS, n_passive>::
         prescribe_riemann_characteristic(
             const state_type &U,
             const state_type &U_bar,
@@ -1141,14 +1179,18 @@ namespace ryujin
       U_new[1 + dim] = p_new / ScalarNumber(gamma() - 1.) +
                        0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
 
+      /* Passive components are transported with the state U: */
+      for (unsigned int k = 0; k < n_passive; ++k)
+        U_new[dim + 2 + k] = rho_new / rho * U[dim + 2 + k];
+
       return U_new;
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     template <typename Lambda>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::apply_boundary_conditions(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::apply_boundary_conditions(
         dealii::types::boundary_id id,
         const state_type &U,
         const dealii::Tensor<1, dim, Number> &normal,
@@ -1244,10 +1286,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::f(const state_type &U) const
-        -> flux_type
+    HyperbolicSystemView<dim, Number, MS, n_passive>::f(
+        const state_type &U) const -> flux_type
     {
       const auto rho_inverse = ScalarNumber(1.) / density(U);
       const auto m = momentum(U);
@@ -1267,51 +1309,78 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView & /*ipv*/,
         const unsigned int /*i*/,
         const state_type &U_i) const -> flux_contribution_type
     {
-      return f(U_i);
+      flux_contribution_type result{f(U_i), {}};
+      if constexpr (n_passive > 0) {
+        const auto rho_inverse = ScalarNumber(1.) / density(U_i);
+        for (unsigned int k = 0; k < n_passive; ++k)
+          result.phi[k] = U_i[dim + 2 + k] * rho_inverse;
+      }
+      return result;
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView & /*ipv*/,
         const unsigned int * /*js*/,
         const state_type &U_j) const -> flux_contribution_type
     {
-      return f(U_j);
+      flux_contribution_type result{f(U_j), {}};
+      if constexpr (n_passive > 0) {
+        const auto rho_inverse = ScalarNumber(1.) / density(U_j);
+        for (unsigned int k = 0; k < n_passive; ++k)
+          result.phi[k] = U_j[dim + 2 + k] * rho_inverse;
+      }
+      return result;
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::flux_divergence(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::flux_divergence(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
-      return -contract(add(flux_i, flux_j), c_ij);
+      const auto flux_ij = -contract(add(flux_i.f, flux_j.f), c_ij);
+
+      state_type result;
+      for (unsigned int k = 0; k < 2 + dim; ++k)
+        result[k] = flux_ij[k];
+
+      if constexpr (n_passive > 0) {
+        /* The density fluxes m_i * c_ij and m_j * c_ij: */
+        const auto m_i_c_ij = flux_i.f[0] * c_ij;
+        const auto m_j_c_ij = flux_j.f[0] * c_ij;
+        for (unsigned int k = 0; k < n_passive; ++k)
+          result[dim + 2 + k] =
+              -(flux_i.phi[k] * m_i_c_ij + flux_j.phi[k] * m_j_c_ij);
+      }
+
+      return result;
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     template <typename ST>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::expand_state(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::expand_state(
         const ST &state) const -> state_type
     {
       using T = typename ST::value_type;
       static_assert(std::is_same_v<Number, T>, "template mismatch");
 
-      constexpr auto dim2 = ST::dimension - 2;
+      constexpr auto dim2 = ST::dimension - 2 - n_passive;
       static_assert(dim >= dim2,
                     "the space dimension of the argument state must not be "
                     "larger than the one of the target state");
@@ -1321,15 +1390,17 @@ namespace ryujin
       result[dim + 1] = state[dim2 + 1];
       for (unsigned int i = 1; i < dim2 + 1; ++i)
         result[i] = state[i];
+      for (unsigned int k = 0; k < n_passive; ++k)
+        result[dim + 2 + k] = state[dim2 + 2 + k];
 
       return result;
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     template <typename ST>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::from_initial_state(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::from_initial_state(
         const ST &initial_state) const -> state_type
     {
       const auto primitive_state = expand_state(initial_state);
@@ -1337,9 +1408,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::from_primitive_state(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::from_primitive_state(
         const state_type &primitive_state) const -> state_type
     {
       const auto &rho = primitive_state[0];
@@ -1359,9 +1430,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::to_primitive_state(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::to_primitive_state(
         const state_type &state) const -> state_type
     {
       const auto &rho = state[0];
@@ -1379,10 +1450,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     template <typename Lambda>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::apply_galilei_transform(
+    HyperbolicSystemView<dim, Number, MS, n_passive>::apply_galilei_transform(
         const state_type &state, const Lambda &lambda) const -> state_type
     {
       auto result = state;

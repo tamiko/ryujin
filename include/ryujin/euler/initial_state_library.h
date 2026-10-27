@@ -16,26 +16,26 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   template <>
-  auto InitialStateLibrary<Euler::HyperbolicSystem, 1, NUMBER>::defaults()
+  auto InitialStateLibrary<Euler::HyperbolicSystem<>, 1, NUMBER>::defaults()
       -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<Euler::HyperbolicSystem, 2, NUMBER>::defaults()
+  auto InitialStateLibrary<Euler::HyperbolicSystem<>, 2, NUMBER>::defaults()
       -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<Euler::HyperbolicSystem, 3, NUMBER>::defaults()
+  auto InitialStateLibrary<Euler::HyperbolicSystem<>, 3, NUMBER>::defaults()
       -> std::vector<Creator>;
 
   extern template class Library<
-      InitialState<Euler::HyperbolicSystem, 1, NUMBER>,
-      const Euler::HyperbolicSystem &,
+      InitialState<Euler::HyperbolicSystem<>, 1, NUMBER>,
+      const Euler::HyperbolicSystem<> &,
       const std::string &>;
   extern template class Library<
-      InitialState<Euler::HyperbolicSystem, 2, NUMBER>,
-      const Euler::HyperbolicSystem &,
+      InitialState<Euler::HyperbolicSystem<>, 2, NUMBER>,
+      const Euler::HyperbolicSystem<> &,
       const std::string &>;
   extern template class Library<
-      InitialState<Euler::HyperbolicSystem, 3, NUMBER>,
-      const Euler::HyperbolicSystem &,
+      InitialState<Euler::HyperbolicSystem<>, 3, NUMBER>,
+      const Euler::HyperbolicSystem<> &,
       const std::string &>;
 #endif
 } // namespace ryujin

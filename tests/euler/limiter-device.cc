@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
 
-  Euler::HyperbolicSystem hyperbolic_system;
+  Euler::HyperbolicSystem<> hyperbolic_system;
   Euler::Limiter<double> limiter(hyperbolic_system);
 
   /* Exercise the parse_parameters_call_back() update path: */

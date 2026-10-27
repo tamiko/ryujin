@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
 
-  Euler::HyperbolicSystem hyperbolic_system;
+  Euler::HyperbolicSystem<> hyperbolic_system;
   Euler::WaveSpeedEstimator<double> wave_speed_estimator(hyperbolic_system);
   Euler::PGRiemannSolver<double> riemann_solver("/RiemannSolver");
 

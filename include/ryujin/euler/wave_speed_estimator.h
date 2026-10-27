@@ -22,7 +22,8 @@ namespace ryujin
   {
     template <int dim,
               typename Number = double,
-              typename MemorySpace = dealii::MemorySpace::Host>
+              typename MemorySpace = dealii::MemorySpace::Host,
+              unsigned int n_passive = 0>
     class WaveSpeedEstimatorView;
 
     /**
@@ -56,7 +57,7 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename ScalarNumber = double>
+    template <typename ScalarNumber = double, unsigned int n_passive = 0>
     class WaveSpeedEstimator : protected PGRiemannSolver<ScalarNumber>
     {
     public:
@@ -68,7 +69,7 @@ namespace ryujin
       /**
        * Constructor.
        */
-      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+      WaveSpeedEstimator(const HyperbolicSystem<n_passive> &hyperbolic_system,
                          const std::string &subsection = "/WaveSpeedEstimator")
           : PGRiemannSolver<ScalarNumber>(subsection)
           , hyperbolic_system_(&hyperbolic_system)
@@ -97,7 +98,7 @@ namespace ryujin
                 typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return WaveSpeedEstimatorView<dim, Number, MemorySpace>{
+        return WaveSpeedEstimatorView<dim, Number, MemorySpace, n_passive>{
             hyperbolic_system_->template view<dim, Number, MemorySpace>(),
             *this};
       }
@@ -109,9 +110,10 @@ namespace ryujin
        */
       //@{
 
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      dealii::ObserverPointer<const HyperbolicSystem<n_passive>>
+          hyperbolic_system_;
 
-      template <int, typename, typename>
+      template <int, typename, typename, unsigned int>
       friend class WaveSpeedEstimatorView;
 
       //@}
@@ -126,7 +128,10 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim,
+              typename Number,
+              typename MemorySpace,
+              unsigned int n_passive>
     class WaveSpeedEstimatorView
     {
     public:
@@ -140,7 +145,7 @@ namespace ryujin
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace, n_passive>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -182,8 +187,9 @@ namespace ryujin
        * Constructor taking a HyperbolicSystemView and a WaveSpeedEstimator
        * object as arguments
        */
-      WaveSpeedEstimatorView(const View &view,
-                             const WaveSpeedEstimator<ScalarNumber> &wse)
+      WaveSpeedEstimatorView(
+          const View &view,
+          const WaveSpeedEstimator<ScalarNumber, n_passive> &wse)
           : view_(view)
           , riemann_solver_view_(
                 static_cast<const PGRiemannSolver<ScalarNumber> &>(wse)
@@ -257,9 +263,9 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
+    WaveSpeedEstimatorView<dim, Number, MS, n_passive>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -267,9 +273,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
+    WaveSpeedEstimatorView<dim, Number, MS, n_passive>::compute(
         const PrecomputedVectorView & /*pv*/,
         const unsigned int /*i*/,
         const unsigned int * /*js*/,
@@ -286,9 +292,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    WaveSpeedEstimatorView<dim, Number, MemorySpace>::riemann_data_from_state(
+    WaveSpeedEstimatorView<dim, Number, MS, n_passive>::riemann_data_from_state(
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {

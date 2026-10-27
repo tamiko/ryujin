@@ -129,7 +129,7 @@ namespace ryujin
 
       using HyperbolicDescription = Euler::HyperbolicDescription;
 
-      using HyperbolicSystem = Euler::HyperbolicSystem;
+      using HyperbolicSystem = Euler::HyperbolicSystem<>;
 
       using InitialValues =
           typename HyperbolicDescription::template InitialValues<dim, Number>;
