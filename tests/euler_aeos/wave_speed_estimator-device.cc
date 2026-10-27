@@ -92,7 +92,7 @@ compute_quantities(const View &wave_speed_estimator_view,
 }
 
 
-void run(const EulerAEOS::HyperbolicSystem &hyperbolic_system,
+void run(const EulerAEOS::HyperbolicSystem<> &hyperbolic_system,
          const EulerAEOS::WaveSpeedEstimator<double> &wave_speed_estimator,
          const EulerAEOS::NASGRiemannSolver<double> &riemann_solver)
 {
@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
 
-  EulerAEOS::HyperbolicSystem hyperbolic_system;
+  EulerAEOS::HyperbolicSystem<> hyperbolic_system;
   EulerAEOS::WaveSpeedEstimator<double> wave_speed_estimator(hyperbolic_system);
   EulerAEOS::NASGRiemannSolver<double> riemann_solver("/RiemannSolver");
 

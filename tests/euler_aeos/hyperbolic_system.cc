@@ -21,7 +21,7 @@ using namespace dealii;
 
 
 template <int dim, typename Number>
-void test(const HyperbolicSystem &hyperbolic_system, const Number gamma)
+void test(const HyperbolicSystem<> &hyperbolic_system, const Number gamma)
 {
   std::cout << std::setprecision(10);
   std::cout << std::scientific;

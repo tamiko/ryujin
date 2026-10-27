@@ -21,7 +21,8 @@ namespace ryujin
   {
     template <int dim,
               typename Number = double,
-              typename MemorySpace = dealii::MemorySpace::Host>
+              typename MemorySpace = dealii::MemorySpace::Host,
+              unsigned int n_passive = 0>
     class IndicatorView;
 
     /**
@@ -63,7 +64,7 @@ namespace ryujin
      *
      * @ingroup EulerAEOSEquations
      */
-    template <typename ScalarNumber = double>
+    template <typename ScalarNumber = double, unsigned int n_passive = 0>
     class Indicator : public dealii::ParameterAcceptor
     {
     public:
@@ -88,7 +89,7 @@ namespace ryujin
       /**
        * Constructor.
        */
-      Indicator(const HyperbolicSystem &hyperbolic_system,
+      Indicator(const HyperbolicSystem<n_passive> &hyperbolic_system,
                 const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
           , parameters_("euler_aeos_indicator_parameters",
@@ -120,7 +121,7 @@ namespace ryujin
                 typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return IndicatorView<dim, Number, MemorySpace>{
+        return IndicatorView<dim, Number, MemorySpace, n_passive>{
             hyperbolic_system_->template view<dim, Number, MemorySpace>(),
             *this};
       }
@@ -140,9 +141,10 @@ namespace ryujin
        */
       //@{
 
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      dealii::ObserverPointer<const HyperbolicSystem<n_passive>>
+          hyperbolic_system_;
 
-      template <int, typename, typename>
+      template <int, typename, typename, unsigned int>
       friend class IndicatorView;
 
       //@}
@@ -157,7 +159,10 @@ namespace ryujin
      *
      * @ingroup EulerAEOSEquations
      */
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim,
+              typename Number,
+              typename MemorySpace,
+              unsigned int n_passive>
     class IndicatorView
     {
     public:
@@ -171,7 +176,7 @@ namespace ryujin
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace, n_passive>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -211,7 +216,8 @@ namespace ryujin
        * Constructor taking a HyperbolicSystemView and an Indicator
        * object as arguments
        */
-      IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
+      IndicatorView(const View &view,
+                    const Indicator<ScalarNumber, n_passive> &indicator)
           : view_(view)
           , parameters_(indicator.parameters_.template view<MemorySpace>())
       {
@@ -260,7 +266,7 @@ namespace ryujin
       //@{
 
       const View view_;
-      const Indicator<ScalarNumber>::Parameters *const parameters_;
+      const Indicator<ScalarNumber, n_passive>::Parameters *const parameters_;
 
       Number rho_i_inverse_ = 0.;
       Number eta_i_ = 0.;
@@ -269,7 +275,7 @@ namespace ryujin
       Number gamma_min_;
 
       Number left_ = 0.;
-      state_type right_;
+      dealii::Tensor<1, 2 + dim, Number> right_;
 
       //@}
     };
@@ -282,9 +288,9 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-    IndicatorView<dim, Number, MemorySpace>::reset(
+    IndicatorView<dim, Number, MS, n_passive>::reset(
         const PrecomputedVectorView &pv,
         const unsigned int i,
         const state_type &U_i,
@@ -313,9 +319,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-    IndicatorView<dim, Number, MemorySpace>::accumulate(
+    IndicatorView<dim, Number, MS, n_passive>::accumulate(
         const PrecomputedVectorView & /*pv*/,
         const unsigned int * /*js*/,
         const state_type &U_j,
@@ -337,23 +343,27 @@ namespace ryujin
       const auto entropy_flux =
           (eta_j * rho_j_inverse - eta_i_ * rho_i_inverse_) * (m_j * c_ij);
 
+      /*
+       * The Harten entropy does not depend on the passive components. It
+       * thus suffices to accumulate the flux of the Euler components:
+       */
       left_ += entropy_flux;
-      for (unsigned int k = 0; k < problem_dimension; ++k) {
+      for (unsigned int k = 0; k < 2 + dim; ++k) {
         const auto component = (f_j[k] - f_i_[k]) * c_ij;
         right_[k] += component;
       }
     }
 
 
-    template <int dim, typename Number, typename MemorySpace>
+    template <int dim, typename Number, typename MS, unsigned int n_passive>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    IndicatorView<dim, Number, MemorySpace>::alpha(const Number hd_i) const
+    IndicatorView<dim, Number, MS, n_passive>::alpha(const Number hd_i) const
     {
       /* Entropy viscosity commutator: */
 
       Number numerator = left_;
       Number denominator = std::abs(left_);
-      for (unsigned int k = 0; k < problem_dimension; ++k) {
+      for (unsigned int k = 0; k < 2 + dim; ++k) {
         numerator -= d_eta_i_[k] * right_[k];
         denominator += std::abs(d_eta_i_[k] * right_[k]);
       }

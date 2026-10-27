@@ -96,7 +96,7 @@ constexpr Quantity quantities[]{
     {"surrogate_pressure", 1},
     {"surrogate_speed_of_sound", 1},
     {"is_admissible", 1},
-    {"f", problem_dimension *dim},
+    {"f", problem_dimension * dim},
     {"flux_divergence", problem_dimension},
     {"to_primitive_state", problem_dimension},
     {"from_primitive_state", problem_dimension},
@@ -241,7 +241,7 @@ int main(int argc, char *argv[])
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
 
-  EulerAEOS::HyperbolicSystem hyperbolic_system;
+  EulerAEOS::HyperbolicSystem<> hyperbolic_system;
 
   /* Exercise the parse_parameters_call_back() update path: */
 

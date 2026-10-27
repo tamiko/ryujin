@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
 
-  EulerAEOS::HyperbolicSystem hyperbolic_system;
+  EulerAEOS::HyperbolicSystem<> hyperbolic_system;
   EulerAEOS::Limiter<double> limiter(hyperbolic_system);
 
   /* Exercise the parse_parameters_call_back() update path: */

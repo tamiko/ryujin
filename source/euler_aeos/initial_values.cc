@@ -9,7 +9,7 @@
 
 namespace ryujin
 {
-  using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
+  using HyperbolicSystem = EulerAEOS::HyperbolicSystem<>;
 
   /* instantiations */
   template class InitialValues<HyperbolicSystem, 1, NUMBER>;
