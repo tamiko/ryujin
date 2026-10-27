@@ -1,0 +1,5 @@
+t = 0.0:
+  q / rho > 1.5 on about 1/2 of the nodes: 1
+t = 0.5:
+  q / rho > 1.5 on about 1/4 of the nodes: 1
+  q / rho in [1, 2]:                       1

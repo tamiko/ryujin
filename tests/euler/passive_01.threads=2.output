@@ -1,0 +1,7 @@
+q / rho = 1:
+  Euler components identical: 1
+  |q / rho - 1| < 1e-12:      1
+q / rho = 1 | 2 (relaxation factor 0):
+  q / rho in [1, 2]:          1
+q / rho = 1 | 2 (relaxation factor 1):
+  q / rho in [0.9493, 2.0251]
