@@ -13,16 +13,34 @@
 #include <ryujin/euler_aeos/hyperbolic_system.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
+#include <bit>
+#include <cstdint>
+
 // #define DEBUG_OUTPUT_LIMITER
 
 namespace ryujin
 {
   namespace EulerAEOS
   {
+    /**
+     * Compile time options for the Limiter.
+     */
+    struct LimiterOptions {
+      /**
+       * A bit mask selecting the passive components that are limited with
+       * local minimum and maximum bounds on their specific value
+       * \f$q_k/\rho\f$: bit k corresponds to passive component k. Passive
+       * components that are not selected are not limited.
+       */
+      std::uint64_t passive_bounds = ~std::uint64_t(0);
+    };
+
+
     template <int dim,
               typename Number = double,
               typename MemorySpace = dealii::MemorySpace::Host,
-              unsigned int n_passive = 0>
+              unsigned int n_passive = 0,
+              LimiterOptions options = LimiterOptions{}>
     class LimiterView;
 
     /**
@@ -57,7 +75,9 @@ namespace ryujin
      *
      * @ingroup EulerAEOSEquations
      */
-    template <typename ScalarNumber = double, unsigned int n_passive = 0>
+    template <typename ScalarNumber = double,
+              unsigned int n_passive = 0,
+              LimiterOptions options = LimiterOptions{}>
     class Limiter : public dealii::ParameterAcceptor
     {
     public:
@@ -137,7 +157,7 @@ namespace ryujin
                 typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return LimiterView<dim, Number, MemorySpace, n_passive>{
+        return LimiterView<dim, Number, MemorySpace, n_passive, options>{
             hyperbolic_system_->template view<dim, Number, MemorySpace>(),
             *this};
       }
@@ -160,7 +180,7 @@ namespace ryujin
       dealii::ObserverPointer<const HyperbolicSystem<n_passive>>
           hyperbolic_system_;
 
-      template <int, typename, typename, unsigned int>
+      template <int, typename, typename, unsigned int, LimiterOptions>
       friend class LimiterView;
 
       //@}
@@ -178,7 +198,8 @@ namespace ryujin
     template <int dim,
               typename Number,
               typename MemorySpace,
-              unsigned int n_passive>
+              unsigned int n_passive,
+              LimiterOptions options>
     class LimiterView
     {
     public:
@@ -209,10 +230,38 @@ namespace ryujin
        * @name Computation and manipulation of bounds
        */
       //@{
+      static_assert(n_passive < 64,
+                    "LimiterOptions::passive_bounds has 64 bits");
+
+      /**
+       * The bit mask of passive components with local bounds.
+       */
+      static constexpr std::uint64_t passive_mask =
+          options.passive_bounds & ((std::uint64_t(1) << n_passive) - 1);
+
+      /**
+       * The number of passive components with local bounds.
+       */
+      static constexpr unsigned int n_bounded_passive =
+          std::popcount(passive_mask);
+
+      /**
+       * Return the index of the @p l-th passive component with local
+       * bounds.
+       */
+      DEAL_II_HOST_DEVICE static constexpr unsigned int
+      bounded_passive_component(unsigned int l)
+      {
+        auto mask = passive_mask;
+        for (; l > 0; --l)
+          mask &= mask - 1; /* clear the lowest bit */
+        return std::countr_zero(mask);
+      }
+
       /**
        * The number of stored entries in the bounds array.
        */
-      static constexpr unsigned int n_bounds = 4 + 2 * n_passive;
+      static constexpr unsigned int n_bounds = 4 + 2 * n_bounded_passive;
 
       /**
        * Array type used to store accumulated bounds.
@@ -224,7 +273,7 @@ namespace ryujin
        * object as arguments
        */
       LimiterView(const View &view,
-                  const Limiter<ScalarNumber, n_passive> &limiter)
+                  const Limiter<ScalarNumber, n_passive, options> &limiter)
           : view_(view)
           , parameters_(limiter.parameters_.template view<MemorySpace>())
       {
@@ -373,7 +422,8 @@ namespace ryujin
       //@{
 
       const View view_;
-      const Limiter<ScalarNumber, n_passive>::Parameters *const parameters_;
+      using Parameters = Limiter<ScalarNumber, n_passive, options>::Parameters;
+      const Parameters *const parameters_;
 
       state_type U_i_;
       flux_contribution_type flux_i_;
@@ -395,12 +445,16 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number, typename MS, unsigned int n_passive>
+    template <int dim,
+              typename Number,
+              typename MS,
+              unsigned int n_passive,
+              LimiterOptions options>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    LimiterView<dim, Number, MS, n_passive>::projection_bounds_from_state(
-        const PrecomputedVectorView &pv,
-        const unsigned int i,
-        const state_type &U_i) const -> Bounds
+    LimiterView<dim, Number, MS, n_passive, options>::
+        projection_bounds_from_state(const PrecomputedVectorView &pv,
+                                     const unsigned int i,
+                                     const state_type &U_i) const -> Bounds
     {
       const auto rho_i = view_.density(U_i);
       const auto &[p_i, gamma_min_i, s_i, eta_i] =
@@ -411,18 +465,23 @@ namespace ryujin
       bounds[1] = /*rho_max*/ rho_i;
       bounds[2] = /*s_min*/ s_i;
       bounds[3] = /*gamma_min*/ gamma_min_i;
-      for (unsigned int k = 0; k < n_passive; ++k) {
+      for (unsigned int l = 0; l < n_bounded_passive; ++l) {
+        const auto k = bounded_passive_component(l);
         const auto phi_i = U_i[dim + 2 + k] / rho_i;
-        bounds[4 + 2 * k] = /*phi_min*/ phi_i;
-        bounds[5 + 2 * k] = /*phi_max*/ phi_i;
+        bounds[4 + 2 * l] = /*phi_min*/ phi_i;
+        bounds[5 + 2 * l] = /*phi_max*/ phi_i;
       }
       return bounds;
     }
 
 
-    template <int dim, typename Number, typename MS, unsigned int n_passive>
+    template <int dim,
+              typename Number,
+              typename MS,
+              unsigned int n_passive,
+              LimiterOptions options>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    LimiterView<dim, Number, MS, n_passive>::combine_bounds(
+    LimiterView<dim, Number, MS, n_passive, options>::combine_bounds(
         const Bounds &bounds_left, const Bounds &bounds_right) const -> Bounds
     {
       Bounds bounds;
@@ -438,9 +497,13 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MS, unsigned int n_passive>
+    template <int dim,
+              typename Number,
+              typename MS,
+              unsigned int n_passive,
+              LimiterOptions options>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    LimiterView<dim, Number, MS, n_passive>::fully_relax_bounds(
+    LimiterView<dim, Number, MS, n_passive, options>::fully_relax_bounds(
         const Bounds &bounds, const Number &hd) const -> Bounds
     {
       const auto &rho_max = bounds[1];
@@ -490,9 +553,13 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MS, unsigned int n_passive>
+    template <int dim,
+              typename Number,
+              typename MS,
+              unsigned int n_passive,
+              LimiterOptions options>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-    LimiterView<dim, Number, MS, n_passive>::reset(
+    LimiterView<dim, Number, MS, n_passive, options>::reset(
         const PrecomputedVectorView &pv,
         const unsigned int i,
         const state_type &U_i,
@@ -525,9 +592,13 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MS, unsigned int n_passive>
+    template <int dim,
+              typename Number,
+              typename MS,
+              unsigned int n_passive,
+              LimiterOptions options>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-    LimiterView<dim, Number, MS, n_passive>::accumulate(
+    LimiterView<dim, Number, MS, n_passive, options>::accumulate(
         const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
@@ -553,7 +624,7 @@ namespace ryujin
 
       /*
        * bar state shifted by an affine shift (the flux of the passive
-       * components is added below):
+       * components is added below for the bounded components only):
        */
       auto U_ij_bar = ScalarNumber(0.5) * (U_i_ + U_j) + affine_shift;
 
@@ -570,18 +641,19 @@ namespace ryujin
 
       /* Bounds on the passive components: */
 
-      if constexpr (n_passive > 0) {
+      if constexpr (n_bounded_passive > 0) {
         /* The flux of a passive component is phi * m: */
         const auto m_i_c_ij = flux_i_.f[0] * scaled_c_ij;
         const auto m_j_c_ij = flux_j.f[0] * scaled_c_ij;
         const auto rho_ij_bar_inverse = ScalarNumber(1.) / rho_ij_bar;
-        for (unsigned int k = 0; k < n_passive; ++k) {
+        for (unsigned int l = 0; l < n_bounded_passive; ++l) {
+          const auto k = bounded_passive_component(l);
           const auto q_ij_bar = U_ij_bar[dim + 2 + k] -
                                 ScalarNumber(0.5) * (flux_j.phi[k] * m_j_c_ij -
                                                      flux_i_.phi[k] * m_i_c_ij);
           const auto phi_ij_bar = q_ij_bar * rho_ij_bar_inverse;
-          auto &phi_min = bounds_[4 + 2 * k];
-          auto &phi_max = bounds_[5 + 2 * k];
+          auto &phi_min = bounds_[4 + 2 * l];
+          auto &phi_max = bounds_[5 + 2 * l];
           phi_min = std::min(phi_min, phi_ij_bar);
           phi_max = std::max(phi_max, phi_ij_bar);
         }
@@ -639,10 +711,14 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MS, unsigned int n_passive>
+    template <int dim,
+              typename Number,
+              typename MS,
+              unsigned int n_passive,
+              LimiterOptions options>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    LimiterView<dim, Number, MS, n_passive>::bounds(const Number hd_i) const
-        -> Bounds
+    LimiterView<dim, Number, MS, n_passive, options>::bounds(
+        const Number hd_i) const -> Bounds
     {
       const auto &rho_min = bounds_[0];
       const auto &rho_max = bounds_[1];
@@ -673,9 +749,13 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number, typename MS, unsigned int n_passive>
+    template <int dim,
+              typename Number,
+              typename MS,
+              unsigned int n_passive,
+              LimiterOptions options>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE std::tuple<Number, bool>
-    LimiterView<dim, Number, MS, n_passive>::limit(
+    LimiterView<dim, Number, MS, n_passive, options>::limit(
         const Bounds &bounds,
         const state_type &U,
         const state_type &P,
@@ -800,7 +880,7 @@ namespace ryujin
        * so that we only have to perform a single division:
        */
 
-      if constexpr (n_passive > 0) {
+      if constexpr (n_bounded_passive > 0) {
         const auto rho_U = view_.density(U);
         const auto rho_P = view_.density(P);
 
@@ -810,9 +890,10 @@ namespace ryujin
         Number numerator = t_r;
         Number denominator = Number(1.);
 
-        for (unsigned int k = 0; k < n_passive; ++k) {
-          const auto &phi_min = bounds[4 + 2 * k];
-          const auto &phi_max = bounds[5 + 2 * k];
+        for (unsigned int l = 0; l < n_bounded_passive; ++l) {
+          const auto k = bounded_passive_component(l);
+          const auto &phi_min = bounds[4 + 2 * l];
+          const auto &phi_max = bounds[5 + 2 * l];
           const auto q_U = U[dim + 2 + k];
           const auto q_P = P[dim + 2 + k];
 
