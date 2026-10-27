@@ -12,6 +12,7 @@
 #include <deal.II/base/parameter_acceptor.h>
 
 #include <array>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -101,6 +102,20 @@ namespace ryujin
       }
 
     protected:
+      /**
+       * Return a copy of @p names with the names @p additional_names
+       * appended for every space dimension.
+       */
+      template <typename Container>
+      static Names append_names(Names names, const Container &additional_names)
+      {
+        for (auto &names_dim : names)
+          names_dim.insert(names_dim.end(),
+                           std::begin(additional_names),
+                           std::end(additional_names));
+        return names;
+      }
+
       /**
        * Constructor.
        */
