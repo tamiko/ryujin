@@ -1,0 +1,8 @@
+q_k / rho = 1:
+  Euler components identical: 1
+  |q_k / rho - 1| < 1e-12:    1
+q_k / rho = 1 | 2 (relaxation factor 0):
+  q_k / rho in [1, 2]:        1
+passive contact q_1 / rho = 1 | 2 (relaxation factor 0):
+  q_1 / rho in [1, 2]:        1
+  q_1 / rho in [1, 2] (0b01): 0
